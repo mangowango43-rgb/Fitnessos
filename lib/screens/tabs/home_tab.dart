@@ -14,7 +14,13 @@ class HomeTab extends ConsumerWidget {
     final user = ref.watch(userProvider);
 
     if (user == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFFBBF24),
+          ),
+        ),
+      );
     }
 
     final goal = GoalConfig.get(user.goalMode);

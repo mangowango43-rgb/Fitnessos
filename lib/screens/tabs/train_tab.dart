@@ -19,7 +19,13 @@ class TrainTab extends ConsumerWidget {
     final recentSessions = ref.watch(recentSessionsProvider);
 
     if (user == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFFBBF24),
+          ),
+        ),
+      );
     }
 
     final goal = GoalConfig.get(user.goalMode);
