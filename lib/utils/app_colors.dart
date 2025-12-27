@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
+  // Cyber Theme Colors - Primary
+  static const cyberLime = Color(0xFFCCFF00); // #CCFF00
+  static const electricCyan = Color(0xFF00F0FF); // #00F0FF
+  static const neonCrimson = Color(0xFFFF003C); // #FF003C
+  static const cyberBlack = Color(0xFF000000); // #000000
+
   // Gradient backgrounds
   static const amberGradient = [
     Color(0xFF78350F), // amber-900
@@ -34,6 +40,12 @@ class AppColors {
     Color(0xFF000000), // black
     Color(0xFF0F172A), // slate-950
     Color(0xFF292524), // stone-950
+  ];
+
+  static const cyberGradient = [
+    Color(0xFF000000), // black
+    Color(0xFF001a1a), // dark teal
+    Color(0xFF000000), // black
   ];
 
   // Solid colors

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
-import '../utils/text_styles.dart';
+import '../widgets/cyber_grid_background.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/train_tab.dart';
-import 'tabs/camera_tab.dart';
+import 'tabs/workouts_tab.dart';
 import 'tabs/you_tab.dart';
-import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,55 +19,29 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _tabs = const [
     HomeTab(),
     TrainTab(),
-    CameraTab(),
+    WorkoutsTab(),
     YouTab(),
   ];
 
   final List<_TabInfo> _tabInfo = const [
-    _TabInfo(icon: Icons.home, label: 'Home'),
-    _TabInfo(icon: Icons.fitness_center, label: 'Train'),
-    _TabInfo(icon: Icons.apple, label: 'Fuel'),
-    _TabInfo(icon: Icons.person, label: 'You'),
+    _TabInfo(icon: Icons.fitness_center, label: 'HOME'),
+    _TabInfo(icon: Icons.videocam, label: 'TRAIN'),
+    _TabInfo(icon: Icons.trending_up, label: 'WORKOUTS'),
+    _TabInfo(icon: Icons.person, label: 'YOU'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppColors.blackGradient,
-        ),
-      ),
+    return CyberGridBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const SettingsScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.settings, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _tabs,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _tabs[_currentIndex],
         ),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
-            color: AppColors.black90,
+            color: Colors.black.withOpacity(0.95),
             border: const Border(
               top: BorderSide(color: AppColors.white10, width: 1),
             ),
@@ -83,40 +56,51 @@ class _HomeScreenState extends State<HomeScreen> {
                   final isActive = _currentIndex == index;
 
                   return Expanded(
-                    child: InkWell(
+                    child: GestureDetector(
                       onTap: () {
                         setState(() {
                           _currentIndex = index;
                         });
                       },
-                      borderRadius: BorderRadius.circular(16),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          color: isActive
-                              ? AppColors.amber400
-                              : Colors.transparent,
+                          horizontal: 8,
+                          vertical: 12,
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              tab.icon,
-                              color: isActive ? Colors.black : AppColors.white50,
-                              size: 20,
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              transform: Matrix4.identity()
+                                ..scale(isActive ? 1.1 : 1.0),
+                              child: Icon(
+                                tab.icon,
+                                color: isActive
+                                    ? AppColors.cyberLime
+                                    : AppColors.white40,
+                                size: 24,
+                                shadows: isActive
+                                    ? [
+                                        Shadow(
+                                          color: AppColors.cyberLime,
+                                          blurRadius: 12,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
                               tab.label,
-                              style: AppTextStyles.labelSmall.copyWith(
-                                color: isActive ? Colors.black : AppColors.white50,
+                              style: TextStyle(
+                                fontSize: 9,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 11,
+                                letterSpacing: 1.5,
+                                color: isActive
+                                    ? AppColors.cyberLime
+                                    : AppColors.white40,
                               ),
                             ),
                           ],

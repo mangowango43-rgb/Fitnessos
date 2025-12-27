@@ -7,12 +7,12 @@ class AppTheme {
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: Colors.black,
-      primaryColor: AppColors.amber400,
+      primaryColor: AppColors.cyberLime,
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.amber400,
-        secondary: AppColors.emerald400,
+        primary: AppColors.cyberLime,
+        secondary: AppColors.electricCyan,
         surface: AppColors.slate900,
-        error: AppColors.rose500,
+        error: AppColors.neonCrimson,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -37,14 +37,15 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.amber400,
+          backgroundColor: AppColors.cyberLime,
           foregroundColor: Colors.black,
           textStyle: AppTextStyles.buttonLarge,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
-          elevation: 4,
+          elevation: 0,
+          shadowColor: AppColors.cyberLime,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -54,7 +55,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           side: const BorderSide(color: AppColors.white20),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
@@ -71,7 +72,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.amber400, width: 2),
+          borderSide: const BorderSide(color: AppColors.cyberLime, width: 2),
         ),
         labelStyle: AppTextStyles.labelMedium,
         hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.white40),
@@ -83,6 +84,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(24),
           side: const BorderSide(color: AppColors.white10),
         ),
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
       ),
     );
   }
