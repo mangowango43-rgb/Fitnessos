@@ -469,36 +469,47 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // REP COUNTER - big and bold
+        // REP COUNTER - Top Right (compact)
         Positioned(
-          top: size.height * 0.3,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-              decoration: BoxDecoration(
-                color: AppColors.cyberLime.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.cyberLime.withOpacity(0.5),
-                    blurRadius: 30,
-                  ),
-                ],
+          top: 120,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.cyberLime.withOpacity(0.5),
+                width: 2,
               ),
-              child: Column(
-                children: [
-                  Text(
-                    '${_session?.currentReps ?? 0}',
-                    style: const TextStyle(fontSize: 72, fontWeight: FontWeight.w900, color: Colors.black),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cyberLime.withOpacity(0.3),
+                  blurRadius: 20,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${_session?.currentReps ?? 0}',
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.cyberLime,
+                    height: 1,
                   ),
-                  Text(
-                    '/ ${exercise.reps}',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black54),
+                ),
+                Text(
+                  '/ ${exercise.reps}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.white50,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
