@@ -3,24 +3,34 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/app_colors.dart';
 import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
+import '../../widgets/glassmorphism_card.dart';
+import '../../widgets/glow_button.dart';
+import '../../models/workout_models.dart';
+import '../../providers/workout_provider.dart';
 
-class TrainTab extends StatefulWidget {
+class TrainTab extends ConsumerStatefulWidget {
   const TrainTab({super.key});
 
   @override
-  State<TrainTab> createState() => _TrainTabState();
+  ConsumerState<TrainTab> createState() => _TrainTabState();
 }
 
-class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
+class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMixin {
+  // Locked workout state
+  LockedWorkout? _lockedWorkout;
+  int _currentExerciseIndex = 0;
+  int _currentSet = 1;
+  int _targetReps = 0;
+  
   // Workout state
   bool _isWorkoutActive = false;
   bool _isRecording = false;
   bool _isResting = false;
   int _repCount = 0;
-  int _currentSet = 1;
   int _restTime = 0;
   String? _formFeedback;
   bool _showRepFlash = false;
@@ -37,14 +47,6 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
   Timer? _restTimer;
   late AnimationController _pulseController;
 
-  final List<Map<String, dynamic>> _currentWorkout = [
-    {'name': 'Bench Press', 'sets': 3, 'reps': 10, 'rest': 90},
-    {'name': 'Incline Press', 'sets': 3, 'reps': 10, 'rest': 90},
-    {'name': 'Chest Flys', 'sets': 3, 'reps': 12, 'rest': 60},
-    {'name': 'Push-ups', 'sets': 3, 'reps': 15, 'rest': 60},
-  ];
-  int _currentExerciseIndex = 0;
-
   @override
   void initState() {
     super.initState();
@@ -52,6 +54,7 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    _loadLockedWorkout();
   }
 
   @override
@@ -62,6 +65,18 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
     _cameraController?.dispose();
     _poseDetectorService?.dispose();
     super.dispose();
+  }
+
+  void _loadLockedWorkout() {
+    final lockedWorkout = ref.read(lockedWorkoutProvider);
+    setState(() {
+      _lockedWorkout = lockedWorkout;
+      if (_lockedWorkout != null && _lockedWorkout!.exercises.isNotEmpty) {
+        _currentExerciseIndex = 0;
+        _currentSet = 1;
+        _targetReps = _lockedWorkout!.exercises.first.reps;
+      }
+    });
   }
 
   Future<void> _initializeCamera() async {
@@ -136,12 +151,15 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
   }
 
   void _startWorkout() {
+    if (_lockedWorkout == null) return;
+    
     setState(() {
       _isWorkoutActive = true;
       _currentExerciseIndex = 0;
       _repCount = 0;
       _currentSet = 1;
       _isResting = false;
+      _targetReps = _lockedWorkout!.exercises.first.reps;
     });
     
     // Initialize camera when workout starts
@@ -150,12 +168,14 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
   }
 
   void _finishSet() {
-    final exercise = _currentWorkout[_currentExerciseIndex];
+    if (_lockedWorkout == null) return;
+    
+    final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
     _repTimer?.cancel();
     
     setState(() {
       _isResting = true;
-      _restTime = exercise['rest'] as int;
+      _restTime = 60; // Default rest time, could be customizable
     });
 
     _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -166,14 +186,18 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
         setState(() {
           _isResting = false;
           _repCount = 0;
-          if (_currentSet < exercise['sets']) {
+          if (_currentSet < exercise.sets) {
             _currentSet++;
-          } else if (_currentExerciseIndex < _currentWorkout.length - 1) {
+            _targetReps = exercise.reps;
+          } else if (_currentExerciseIndex < _lockedWorkout!.exercises.length - 1) {
             _currentExerciseIndex++;
             _currentSet = 1;
+            _targetReps = _lockedWorkout!.exercises[_currentExerciseIndex].reps;
+          } else {
+            // Workout complete!
+            _endWorkout();
           }
         });
-        // NO MORE SIMULATION - Phase 2 will add real rep counting
       }
     });
   }
@@ -213,57 +237,213 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
   }
 
   Widget _buildStartScreen() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.fitness_center,
-            size: 80,
-            color: AppColors.cyberLime,
+    if (_lockedWorkout == null) {
+      // No workout locked - show message
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.lock_open,
+                size: 80,
+                color: AppColors.white30,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'NO WORKOUT LOCKED',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Visit the WORKOUTS tab to lock a workout and start training.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.white60,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              GlowButton(
+                text: 'GO TO WORKOUTS',
+                onPressed: () {
+                  // Navigate to Workouts tab
+                  DefaultTabController.of(context).animateTo(1); // Workouts tab is index 1
+                },
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          const Text(
-            'READY TO TRAIN?',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 48),
-          GestureDetector(
-            onTap: _startWorkout,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
-              decoration: BoxDecoration(
-                color: AppColors.cyberLime,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.cyberLime.withOpacity(0.6),
-                    blurRadius: 30,
+        ),
+      );
+    }
+
+    // Workout is locked - show workout summary
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Spacer(),
+            GlassmorphismCard(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cyberLime.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.lock,
+                      color: AppColors.cyberLime,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'YOUR LOCKED WORKOUT',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.white60,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _lockedWorkout!.name,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildWorkoutInfo(
+                        '${_lockedWorkout!.exercises.length}',
+                        'EXERCISES',
+                      ),
+                      const SizedBox(width: 24),
+                      _buildWorkoutInfo(
+                        '~${_lockedWorkout!.estimatedMinutes}',
+                        'MINUTES',
+                      ),
+                      if (_lockedWorkout!.isCircuit && _lockedWorkout!.rounds != null) ...[
+                        const SizedBox(width: 24),
+                        _buildWorkoutInfo(
+                          '${_lockedWorkout!.rounds}',
+                          'ROUNDS',
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.white5,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.white10,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'EXERCISES:',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.white50,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ..._lockedWorkout!.exercises.take(4).map((ex) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            _lockedWorkout!.isCircuit
+                                ? '• ${ex.name} - ${ex.timeSeconds}s'
+                                : '• ${ex.name} - ${ex.sets}x${ex.reps}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.white70,
+                            ),
+                          ),
+                        )),
+                        if (_lockedWorkout!.exercises.length > 4)
+                          Text(
+                            '+ ${_lockedWorkout!.exercises.length - 4} more...',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.white40,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              child: const Text(
-                'START WORKOUT',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
-                  letterSpacing: 1.2,
-                ),
-              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            GlowButton(
+              text: '⚡ START WORKOUT',
+              onPressed: _startWorkout,
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
+              fontSize: 18,
+            ),
+            const Spacer(),
+          ],
+        ),
       ),
     );
   }
 
+  Widget _buildWorkoutInfo(String value, String label) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            color: AppColors.cyberLime,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.white50,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTrainingScreen() {
-    final exercise = _currentWorkout[_currentExerciseIndex];
+    if (_lockedWorkout == null) return _buildStartScreen();
+    
+    final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
     final size = MediaQuery.of(context).size;
 
     // Show error if camera failed
@@ -356,26 +536,36 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
             ),
           ),
 
-        // DEBUG: Show landmark count indicator
-        Positioned(
-          top: 200,
-          left: 16,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _landmarks != null ? Colors.green.withOpacity(0.7) : Colors.red.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              _landmarks != null ? '✅ TRACKING: ${_landmarks!.length} points' : '❌ NO POSE DETECTED',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+        // Minimal tracking indicator
+        if (_landmarks != null)
+          Positioned(
+            top: 120,
+            left: 16,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.cyberLime.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.cyberLime,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.cyberLime.withOpacity(0.4),
+                    blurRadius: 12,
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.check,
+                color: AppColors.cyberLime,
+                size: 20,
               ),
             ),
           ),
-        ),
 
         // Screen flash effect
         if (_screenFlash)
@@ -405,7 +595,7 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  exercise['name'].toString().toUpperCase(),
+                  exercise.name.toUpperCase(),
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
@@ -415,7 +605,7 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'SET $_currentSet / ${exercise['sets']}',
+                  'SET $_currentSet / ${exercise.sets}',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -543,7 +733,7 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
-              _currentWorkout.length,
+              _lockedWorkout?.exercises.length ?? 0,
               (index) => Container(
                 width: index == _currentExerciseIndex ? 24 : 8,
                 height: 8,
@@ -567,14 +757,14 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
           ),
         ),
 
-        // Compact Rep Counter - Bottom Left
+        // Compact Rep Counter - Top Right
         Positioned(
-          bottom: 100,
-          left: 16,
+          top: 40,
+          right: 16,
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
+              color: Colors.black.withOpacity(0.8),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: AppColors.cyberLime.withOpacity(0.3),
@@ -588,26 +778,26 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
               ],
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 AnimatedBuilder(
                   animation: _pulseController,
                   builder: (context, child) {
-                    final scale = 1.0 + (_pulseController.value * 0.3);
+                    final scale = 1.0 + (_pulseController.value * 0.2);
                     return Transform.scale(
                       scale: scale,
-                      alignment: Alignment.centerLeft,
                       child: Text(
                         '$_repCount',
                         style: TextStyle(
-                          fontSize: 56,
+                          fontSize: 48,
                           fontWeight: FontWeight.w900,
                           color: AppColors.cyberLime,
                           shadows: [
                             Shadow(
                               color: AppColors.cyberLime
                                   .withOpacity(_pulseController.value),
-                              blurRadius: 40,
+                              blurRadius: 30,
                             ),
                           ],
                         ),
@@ -615,11 +805,13 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
                     );
                   },
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  'TARGET: ${exercise['reps']}',
+                  '/ ${exercise.reps}',
                   style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.white40,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.white50,
                   ),
                 ),
               ],
@@ -749,7 +941,9 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
   }
 
   Widget _buildRestScreen() {
-    final exercise = _currentWorkout[_currentExerciseIndex];
+    if (_lockedWorkout == null) return _buildStartScreen();
+    
+    final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
     
     return Container(
       color: Colors.black.withOpacity(0.95),
@@ -792,7 +986,7 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
               },
             ),
             const SizedBox(height: 48),
-            if (_currentSet < exercise['sets'])
+            if (_currentSet < exercise.sets)
               Text(
                 'NEXT: SET ${_currentSet + 1}',
                 style: const TextStyle(
@@ -801,9 +995,9 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
                   color: AppColors.white80,
                 ),
               )
-            else if (_currentExerciseIndex < _currentWorkout.length - 1)
+            else if (_lockedWorkout != null && _currentExerciseIndex < _lockedWorkout!.exercises.length - 1)
               Text(
-                'NEXT: ${_currentWorkout[_currentExerciseIndex + 1]['name']}'.toUpperCase(),
+                'NEXT: ${_lockedWorkout!.exercises[_currentExerciseIndex + 1].name}'.toUpperCase(),
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,

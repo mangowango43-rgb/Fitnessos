@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
+import '../models/workout_models.dart';
 
 class StorageService {
   static const String _keyOnboardingComplete = 'onboarding_complete';
   static const String _keyUser = 'user';
   static const String _keyUnitsMetric = 'units_metric';
   static const String _keyNotificationsEnabled = 'notifications_enabled';
+  static const String _keyLockedWorkout = 'locked_workout';
 
   final SharedPreferences _prefs;
 
@@ -53,6 +55,26 @@ class StorageService {
 
   Future<void> setNotificationsEnabled(bool value) async {
     await _prefs.setBool(_keyNotificationsEnabled, value);
+  }
+
+  // Locked Workout
+  LockedWorkout? getLockedWorkout() {
+    final jsonString = _prefs.getString(_keyLockedWorkout);
+    if (jsonString == null) return null;
+    try {
+      return LockedWorkout.fromJson(jsonDecode(jsonString));
+    } catch (e) {
+      print('Error loading locked workout: $e');
+      return null;
+    }
+  }
+
+  Future<void> saveLockedWorkout(LockedWorkout workout) async {
+    await _prefs.setString(_keyLockedWorkout, jsonEncode(workout.toJson()));
+  }
+
+  Future<void> clearLockedWorkout() async {
+    await _prefs.remove(_keyLockedWorkout);
   }
 }
 

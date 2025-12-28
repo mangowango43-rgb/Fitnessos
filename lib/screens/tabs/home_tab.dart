@@ -5,16 +5,25 @@ import '../../utils/text_styles.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../widgets/bio_rings.dart';
+import '../../providers/workout_provider.dart';
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final lockedWorkout = ref.watch(lockedWorkoutProvider);
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100, left: 20, right: 20, top: 16),
       child: Column(
         children: [
+          // Locked Workout Card (if exists)
+          if (lockedWorkout != null) ...[
+            _buildLockedWorkoutCard(context, lockedWorkout),
+            const SizedBox(height: 24),
+          ],
+          
           // Compact Mission Card
           _buildMissionCard(context),
           const SizedBox(height: 48),
@@ -34,6 +43,137 @@ class HomeTab extends ConsumerWidget {
           // Battle Logs
           _buildBattleLogs(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLockedWorkoutCard(BuildContext context, dynamic lockedWorkout) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: RadialGradient(
+          center: Alignment.topRight,
+          radius: 1.5,
+          colors: [
+            AppColors.electricCyan.withOpacity(0.2),
+            AppColors.cyberLime.withOpacity(0.15),
+            Colors.black.withOpacity(0.8),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.electricCyan.withOpacity(0.4),
+            blurRadius: 20,
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: AppColors.electricCyan.withOpacity(0.2),
+            blurRadius: 40,
+            spreadRadius: 0,
+          ),
+        ],
+        border: Border.all(
+          color: AppColors.electricCyan.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.electricCyan.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.lock,
+                    color: AppColors.electricCyan,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'READY TO TRAIN',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.white70,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              lockedWorkout.name,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildWorkoutBadge(
+                  '${lockedWorkout.exercises.length} exercises',
+                ),
+                const SizedBox(width: 8),
+                _buildWorkoutBadge(
+                  '~${lockedWorkout.estimatedMinutes} min',
+                ),
+                if (lockedWorkout.isCircuit && lockedWorkout.rounds != null) ...[
+                  const SizedBox(width: 8),
+                  _buildWorkoutBadge(
+                    '${lockedWorkout.rounds} rounds',
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 20),
+            GlowButton(
+              text: '⚡ START WORKOUT',
+              onPressed: () {
+                // Navigate to Train tab
+                DefaultTabController.of(context).animateTo(2); // Train tab is index 2
+              },
+              glowColor: AppColors.electricCyan,
+              backgroundColor: AppColors.electricCyan,
+              textColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkoutBadge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.white10,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.white20,
+          width: 1,
+        ),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppColors.white70,
+        ),
       ),
     );
   }

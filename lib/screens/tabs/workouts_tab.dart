@@ -1,104 +1,224 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/workout_data.dart';
+import '../../models/workout_models.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/text_styles.dart';
 import '../../widgets/glassmorphism_card.dart';
+import '../../widgets/glow_button.dart';
+import '../../providers/workout_provider.dart';
+import '../workout_editor_screen.dart';
 
-class WorkoutsTab extends StatefulWidget {
+class WorkoutsTab extends ConsumerStatefulWidget {
   const WorkoutsTab({super.key});
 
   @override
-  State<WorkoutsTab> createState() => _WorkoutsTabState();
+  ConsumerState<WorkoutsTab> createState() => _WorkoutsTabState();
 }
 
-class _WorkoutsTabState extends State<WorkoutsTab> {
+class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
+  String _selectedMode = 'gym'; // 'gym' or 'home'
   String? _selectedCategory;
-  String? _selectedSubcategory;
 
   @override
   Widget build(BuildContext context) {
     if (_selectedCategory == null) {
-      return _buildCategorySelection();
+      return _buildMainScreen();
+    } else {
+      return _buildPresetList();
     }
-
-    if (_selectedCategory == 'splits' && _selectedSubcategory == null) {
-      return _buildMuscleSplitSelection();
-    }
-
-    if (_selectedCategory == 'circuits') {
-      return _buildCircuitsList();
-    }
-
-    if (_selectedCategory == 'training_splits') {
-      return _buildTrainingSplitsList();
-    }
-
-    if (_selectedCategory == 'at_home') {
-      return _buildExercisesList(WorkoutData.atHomeExercises, 'AT HOME');
-    }
-
-    if (_selectedCategory == 'cardio') {
-      return _buildExercisesList(WorkoutData.cardioExercises, 'CARDIO ONLY');
-    }
-
-    if (_selectedCategory == 'splits' && _selectedSubcategory != null) {
-      final exercises = WorkoutData.muscleSplits[_selectedSubcategory] ?? [];
-      final title = WorkoutData.muscleSplitInfo[_selectedSubcategory] ?? 'EXERCISES';
-      return _buildExercisesList(exercises, title);
-    }
-
-    return _buildCategorySelection();
   }
 
-  Widget _buildCategorySelection() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildMainScreen() {
+    return Column(
+      children: [
+        // GYM/HOME Toggle
+        _buildModeToggle(),
+        
+        // Category Cards
+        Expanded(
+          child: _buildCategoryCards(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeToggle() {
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.white5,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.white10,
+          width: 1,
+        ),
+      ),
+      child: Row(
         children: [
-          const SizedBox(height: 16),
-          const Text(
-            'CHOOSE MODE',
-            style: TextStyle(
-              fontSize: 42,
-              fontWeight: FontWeight.w900,
-              color: AppColors.cyberLime,
-              height: 1.1,
-            ),
+          Expanded(
+            child: _buildToggleButton('GYM', 'gym'),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Select your training style',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.white50,
-            ),
+          Expanded(
+            child: _buildToggleButton('HOME', 'home'),
           ),
-          const SizedBox(height: 32),
-          ...WorkoutData.categories.map((category) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: _buildCategoryCard(category),
-          )),
-          const SizedBox(height: 80),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryCard(WorkoutCategory category) {
+  Widget _buildToggleButton(String label, String mode) {
+    final isActive = _selectedMode == mode;
     return GestureDetector(
       onTap: () {
         setState(() {
-          _selectedCategory = category.id;
-          _selectedSubcategory = null;
+          _selectedMode = mode;
+          _selectedCategory = null;
         });
+        HapticFeedback.lightImpact();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.cyberLime : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: AppColors.cyberLime.withOpacity(0.4),
+                    blurRadius: 20,
+                    spreadRadius: 0,
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+              color: isActive ? Colors.black : AppColors.white60,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCards() {
+    final categories = _getCategoriesForMode();
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _selectedMode == 'gym' ? 'GYM WORKOUTS' : 'HOME WORKOUTS',
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _selectedMode == 'gym'
+                ? 'Build strength with equipment'
+                : 'Train anywhere, anytime',
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.white50,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ...categories.map((category) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildCategoryCard(category),
+          )),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, String>> _getCategoriesForMode() {
+    if (_selectedMode == 'gym') {
+      return [
+        {
+          'id': 'muscle_splits',
+          'name': 'MUSCLE SPLITS',
+          'icon': '💪',
+          'desc': 'Target specific muscle groups',
+        },
+        {
+          'id': 'muscle_groupings',
+          'name': 'MUSCLE GROUPINGS',
+          'icon': '🎯',
+          'desc': 'Pre-built workout combinations',
+        },
+        {
+          'id': 'gym_circuits',
+          'name': 'GYM CIRCUITS',
+          'icon': '⚡',
+          'desc': 'High-intensity timed workouts',
+        },
+        {
+          'id': 'booty_builder',
+          'name': 'BOOTY BUILDER',
+          'icon': '🍑',
+          'desc': "Women's glute-focused workouts",
+        },
+      ];
+    } else {
+      return [
+        {
+          'id': 'bodyweight_basics',
+          'name': 'BODYWEIGHT BASICS',
+          'icon': '🏠',
+          'desc': 'No equipment needed',
+        },
+        {
+          'id': 'hiit_circuits',
+          'name': 'HIIT CIRCUITS',
+          'icon': '⚡',
+          'desc': 'High intensity, no equipment',
+        },
+        {
+          'id': 'home_booty',
+          'name': 'HOME BOOTY',
+          'icon': '🍑',
+          'desc': 'Glute workouts at home',
+        },
+        {
+          'id': 'recovery',
+          'name': 'RECOVERY & MOBILITY',
+          'icon': '🧘',
+          'desc': 'Stretching and mobility work',
+        },
+      ];
+    }
+  }
+
+  Widget _buildCategoryCard(Map<String, String> category) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = category['id'];
+        });
+        HapticFeedback.lightImpact();
       },
       child: GlassmorphismCard(
         padding: const EdgeInsets.all(24),
         child: Row(
           children: [
             Text(
-              category.icon,
-              style: const TextStyle(fontSize: 60),
+              category['icon']!,
+              style: const TextStyle(fontSize: 56),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -106,16 +226,16 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    category.name,
+                    category['name']!,
                     style: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    category.description,
+                    category['desc']!,
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.white60,
@@ -135,121 +255,42 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
     );
   }
 
-  Widget _buildMuscleSplitSelection() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => setState(() => _selectedCategory = null),
-                child: const Text(
-                  '← Back',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.white50,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'MUSCLE SPLITS',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          ...WorkoutData.muscleSplitInfo.entries.map((entry) {
-            final exercises = WorkoutData.muscleSplits[entry.key] ?? [];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: GestureDetector(
-                onTap: () => setState(() => _selectedSubcategory = entry.key),
-                child: GlassmorphismCard(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Text(
-                        entry.value.split(' ').last,
-                        style: const TextStyle(fontSize: 50),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              entry.value.split(' ').first,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              '${exercises.length} exercises',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.white60,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: AppColors.white40,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
+  Widget _buildPresetList() {
+    final presets = _getPresetsForCategory();
 
-  Widget _buildExercisesList(List<Exercise> exercises, String title) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 16),
-          Row(
+    return Column(
+      children: [
+        // Header with back button
+        Container(
+          padding: const EdgeInsets.all(20),
+          child: Row(
             children: [
               GestureDetector(
-                onTap: () => setState(() {
-                  if (_selectedSubcategory != null) {
-                    _selectedSubcategory = null;
-                  } else {
+                onTap: () {
+                  setState(() {
                     _selectedCategory = null;
-                  }
-                }),
-                child: const Text(
-                  '← Back',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.white50,
+                  });
+                  HapticFeedback.lightImpact();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.white10,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 24,
                   ),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  title,
+                  _getCategoryName(),
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
@@ -257,313 +298,246 @@ class _WorkoutsTabState extends State<WorkoutsTab> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          ...exercises.map((exercise) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: GestureDetector(
-              onTap: () {
-                // Add to workout logic
-              },
-              child: GlassmorphismCard(
-                padding: const EdgeInsets.all(18),
-                borderRadius: BorderRadius.circular(20),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.cyberLime.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: AppColors.cyberLime,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            exercise.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            exercise.difficulty.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _getDifficultyColor(exercise.difficulty),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right,
-                      color: AppColors.white30,
-                      size: 20,
-                    ),
-                  ],
-                ),
-              ),
+        ),
+
+        // Preset cards
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(left: 20, right: 20, bottom: 100),
+            child: Column(
+              children: presets.map((preset) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildPresetCard(preset),
+              )).toList(),
             ),
-          )),
-          const SizedBox(height: 80),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildCircuitsList() {
-    return SingleChildScrollView(
+  List<WorkoutPreset> _getPresetsForCategory() {
+    switch (_selectedCategory) {
+      // GYM MODE
+      case 'muscle_splits':
+        return WorkoutData.gymMuscleSplits;
+      case 'muscle_groupings':
+        return WorkoutData.gymMuscleGroupings;
+      case 'gym_circuits':
+        return WorkoutData.gymCircuits;
+      case 'booty_builder':
+        return WorkoutData.gymBootyBuilder;
+      // HOME MODE
+      case 'bodyweight_basics':
+        return WorkoutData.homeBodyweightBasics;
+      case 'hiit_circuits':
+        return WorkoutData.homeHIITCircuits;
+      case 'home_booty':
+        return WorkoutData.homeBooty;
+      case 'recovery':
+        return WorkoutData.homeRecovery;
+      default:
+        return [];
+    }
+  }
+
+  String _getCategoryName() {
+    final categories = _getCategoriesForMode();
+    final category = categories.firstWhere(
+      (c) => c['id'] == _selectedCategory,
+      orElse: () => {'name': 'WORKOUTS'},
+    );
+    return category['name']!;
+  }
+
+  Widget _buildPresetCard(WorkoutPreset preset) {
+    final includedExercises = preset.exercises.where((e) => e.included).toList();
+    
+    return GlassmorphismCard(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16),
+          // Preset name and icon
           Row(
             children: [
-              GestureDetector(
-                onTap: () => setState(() => _selectedCategory = null),
-                child: const Text(
-                  '← Back',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.white50,
-                  ),
+              if (preset.icon != null) ...[
+                Text(
+                  preset.icon!,
+                  style: const TextStyle(fontSize: 32),
                 ),
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'CIRCUITS',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Text(
+                  preset.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          ...WorkoutData.circuits.map((circuit) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: GestureDetector(
-              onTap: () {
-                // Start circuit
-              },
-              child: GlassmorphismCard(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          circuit.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getDifficultyColor(circuit.difficulty).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            circuit.difficulty.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: _getDifficultyColor(circuit.difficulty),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildCircuitBadge('⏱️ ${circuit.duration}'),
-                        const SizedBox(width: 8),
-                        _buildCircuitBadge('${circuit.exercises.length} exercises'),
-                        const SizedBox(width: 8),
-                        _buildCircuitBadge('${circuit.rounds} rounds'),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ...circuit.exercises.take(3).map((ex) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '• ${ex.name} - ${ex.timeSeconds}s / ${ex.restSeconds}s rest',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.white60,
-                        ),
-                      ),
-                    )),
-                  ],
-                ),
+          const SizedBox(height: 12),
+
+          // Exercise count and duration
+          Row(
+            children: [
+              _buildInfoBadge('${includedExercises.length} exercises'),
+              const SizedBox(width: 8),
+              _buildInfoBadge('~${preset.estimatedMinutes} min'),
+              if (preset.isCircuit && preset.rounds != null) ...[
+                const SizedBox(width: 8),
+                _buildInfoBadge('${preset.rounds} rounds'),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Exercise preview (first 3)
+          ...includedExercises.take(3).map((ex) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              preset.isCircuit
+                  ? '• ${ex.name} - ${ex.timeSeconds}s / ${ex.restSeconds}s rest'
+                  : '• ${ex.name} - ${ex.sets}x${ex.reps}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.white60,
               ),
             ),
           )),
-          const SizedBox(height: 80),
+          if (includedExercises.length > 3)
+            Text(
+              '+ ${includedExercises.length - 3} more...',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.white40,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          const SizedBox(height: 20),
+
+          // LOCK and EDIT buttons
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: GlowButton(
+                  text: '🔒 LOCK',
+                  onPressed: () => _lockWorkout(preset),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _editWorkout(preset),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.cyberLime,
+                        width: 2,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        '✏️ EDIT',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.cyberLime,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCircuitBadge(String text) {
+  Widget _buildInfoBadge(String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.white5,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.white10,
+          width: 1,
+        ),
       ),
       child: Text(
         text,
         style: const TextStyle(
           fontSize: 11,
-          color: AppColors.white60,
           fontWeight: FontWeight.w600,
+          color: AppColors.white70,
         ),
       ),
     );
   }
 
-  Widget _buildTrainingSplitsList() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 16),
-          Row(
+  Future<void> _lockWorkout(WorkoutPreset preset) async {
+    HapticFeedback.mediumImpact();
+    
+    // Lock the workout
+    await ref.read(lockedWorkoutProvider.notifier).lockWorkout(preset);
+    
+    // Show confirmation
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
             children: [
-              GestureDetector(
-                onTap: () => setState(() => _selectedCategory = null),
-                child: const Text(
-                  '← Back',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.white50,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'TRAINING SPLITS',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
+              const Icon(Icons.lock, color: AppColors.cyberLime),
+              const SizedBox(width: 12),
+              Text(
+                'Workout Locked! 🔒',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          ...WorkoutData.trainingSplits.map((split) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: GlassmorphismCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        split.icon,
-                        style: const TextStyle(fontSize: 32),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          split.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  ...split.days.map((day) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.white5,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.white10,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            day.name,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.cyberLime,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 4,
-                            runSpacing: 4,
-                            children: day.exercises
-                                .map((ex) => Text(
-                                      '$ex • ',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.white60,
-                                      ),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )),
-                ],
-              ),
-            ),
-          )),
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
+          backgroundColor: AppColors.white10,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppColors.cyberLime.withOpacity(0.3)),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
-  Color _getDifficultyColor(String difficulty) {
-    switch (difficulty.toLowerCase()) {
-      case 'beginner':
-        return AppColors.emerald400;
-      case 'intermediate':
-        return AppColors.amber400;
-      case 'advanced':
-        return AppColors.neonCrimson;
-      default:
-        return AppColors.white60;
+  Future<void> _editWorkout(WorkoutPreset preset) async {
+    HapticFeedback.lightImpact();
+    
+    // Navigate to editor
+    final result = await Navigator.push<WorkoutPreset>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WorkoutEditorScreen(preset: preset),
+      ),
+    );
+    
+    // If user locked from editor, result will be returned
+    if (result != null) {
+      // Already locked in editor screen
     }
   }
 }
-
