@@ -33,6 +33,35 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
   Widget _buildMainScreen() {
     return Column(
       children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'WORKOUTS',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.cyberLime,
+                  letterSpacing: -0.5,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Lock a workout to start training',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.white50,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
         // GYM/HOME Toggle
         _buildModeToggle(),
         
@@ -46,7 +75,7 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
 
   Widget _buildModeToggle() {
     return Container(
-      margin: const EdgeInsets.all(20),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.white5,

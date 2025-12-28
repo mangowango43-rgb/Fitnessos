@@ -20,13 +20,9 @@ class HomeTab extends ConsumerWidget {
         children: [
           // Locked Workout Card (if exists)
           if (lockedWorkout != null) ...[
-            _buildLockedWorkoutCard(context, lockedWorkout),
+            _buildLockedWorkoutCard(context, ref, lockedWorkout),
             const SizedBox(height: 24),
           ],
-          
-          // Compact Mission Card
-          _buildMissionCard(context),
-          const SizedBox(height: 48),
 
           // Bio-feedback Rings
           const BioRings(
@@ -47,108 +43,177 @@ class HomeTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildLockedWorkoutCard(BuildContext context, dynamic lockedWorkout) {
+  Widget _buildLockedWorkoutCard(BuildContext context, WidgetRef ref, dynamic lockedWorkout) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         gradient: RadialGradient(
           center: Alignment.topRight,
           radius: 1.5,
           colors: [
-            AppColors.electricCyan.withOpacity(0.2),
-            AppColors.cyberLime.withOpacity(0.15),
+            AppColors.cyberLime.withOpacity(0.2),
+            AppColors.cyberLime.withOpacity(0.1),
             Colors.black.withOpacity(0.8),
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.electricCyan.withOpacity(0.4),
+            color: AppColors.cyberLime.withOpacity(0.3),
             blurRadius: 20,
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: AppColors.electricCyan.withOpacity(0.2),
-            blurRadius: 40,
             spreadRadius: 0,
           ),
         ],
         border: Border.all(
-          color: AppColors.electricCyan.withOpacity(0.3),
+          color: AppColors.cyberLime.withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header with lock icon
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.electricCyan.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.cyberLime.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
                     Icons.lock,
-                    color: AppColors.electricCyan,
-                    size: 24,
+                    color: AppColors.cyberLime,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'READY TO TRAIN',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
+                const SizedBox(width: 10),
+                const Text(
+                  'READY TO TRAIN',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.white60,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Workout name
+            Text(
+              lockedWorkout.name,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: AppColors.cyberLime,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // Exercise list (compact)
+            ...lockedWorkout.exercises.take(3).map((ex) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.cyberLime.withOpacity(0.6),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${ex.name} • ${ex.sets}x${ex.reps}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.white70,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+            if (lockedWorkout.exercises.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 12),
+                child: Text(
+                  '+${lockedWorkout.exercises.length - 3} more',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.white50,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 12),
+            
+            // Buttons row
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      DefaultTabController.of(context).animateTo(2);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyberLime,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.cyberLime.withOpacity(0.4),
+                            blurRadius: 12,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        'START WORKOUT',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () async {
+                    // Clear the locked workout
+                    await ref.read(lockedWorkoutProvider.notifier).clearLockedWorkout();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.white10,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.white20,
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.edit,
                       color: AppColors.white70,
-                      letterSpacing: 2,
+                      size: 18,
                     ),
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              lockedWorkout.name,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildWorkoutBadge(
-                  '${lockedWorkout.exercises.length} exercises',
-                ),
-                const SizedBox(width: 8),
-                _buildWorkoutBadge(
-                  '~${lockedWorkout.estimatedMinutes} min',
-                ),
-                if (lockedWorkout.isCircuit && lockedWorkout.rounds != null) ...[
-                  const SizedBox(width: 8),
-                  _buildWorkoutBadge(
-                    '${lockedWorkout.rounds} rounds',
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 20),
-            GlowButton(
-              text: '⚡ START WORKOUT',
-              onPressed: () {
-                // Navigate to Train tab
-                DefaultTabController.of(context).animateTo(2); // Train tab is index 2
-              },
-              glowColor: AppColors.electricCyan,
-              backgroundColor: AppColors.electricCyan,
-              textColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ],
         ),
