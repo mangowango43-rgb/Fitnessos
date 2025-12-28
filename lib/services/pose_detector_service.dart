@@ -1,6 +1,7 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:camera/camera.dart';
 import 'dart:typed_data';
+import 'dart:ui' show Size;
 
 /// Service for detecting human poses using Google ML Kit
 /// Processes camera frames and returns skeleton landmarks
