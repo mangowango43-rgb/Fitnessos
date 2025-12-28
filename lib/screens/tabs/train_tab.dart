@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/app_colors.dart';
 import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
@@ -226,7 +227,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     setState(() => _isResting = false);
     
     // Start next set or next exercise
-    if (_session?.currentSet ?? 0 < (_session?.targetSets ?? 0)) {
+    if ((_session?.currentSet ?? 0) < (_session?.targetSets ?? 0)) {
       _session?.startNextSet();
     } else {
       _startCurrentExercise();
