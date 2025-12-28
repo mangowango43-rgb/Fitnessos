@@ -351,6 +351,7 @@ class _TrainTabState extends State<TrainTab> with TickerProviderStateMixin {
                   _cameraController!.value.previewSize!.height,
                   _cameraController!.value.previewSize!.width,
                 ),
+                isFrontCamera: true, // Front camera for selfie mode
               ),
             ),
           ),
