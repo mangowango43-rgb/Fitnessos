@@ -2,18 +2,72 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../utils/app_colors.dart';
 
+/// Form quality levels for visual feedback
+enum FormQuality {
+  good,    // Green - form score >= 80
+  okay,    // Yellow - form score 50-79
+  bad,     // Red - form score < 50
+  neutral, // Cyan - no exercise active / between reps
+}
+
 /// CustomPainter that draws a glowing cyber-themed skeleton overlay
-/// Uses Electric Cyan for lines and Cyber Lime for joints
+/// Color changes based on form quality during exercise
 class SkeletonPainter extends CustomPainter {
   final List<PoseLandmark>? landmarks;
   final Size imageSize;
   final bool isFrontCamera;
+  final FormQuality formQuality;
+  final double? currentAngle; // Optional: display current angle for debugging
 
   SkeletonPainter({
     required this.landmarks,
     required this.imageSize,
-    this.isFrontCamera = true, // Default to front camera
+    this.isFrontCamera = true,
+    this.formQuality = FormQuality.neutral,
+    this.currentAngle,
   });
+
+  /// Get skeleton color based on form quality
+  Color get _skeletonColor {
+    switch (formQuality) {
+      case FormQuality.good:
+        return const Color(0xFF00FF66); // Bright Green
+      case FormQuality.okay:
+        return const Color(0xFFFFDD00); // Yellow/Gold
+      case FormQuality.bad:
+        return const Color(0xFFFF003C); // Neon Red (your Neon Crimson)
+      case FormQuality.neutral:
+        return AppColors.electricCyan; // Default cyan
+    }
+  }
+
+  /// Get joint color based on form quality
+  Color get _jointColor {
+    switch (formQuality) {
+      case FormQuality.good:
+        return const Color(0xFF00FF66);
+      case FormQuality.okay:
+        return const Color(0xFFFFDD00);
+      case FormQuality.bad:
+        return const Color(0xFFFF003C);
+      case FormQuality.neutral:
+        return AppColors.cyberLime;
+    }
+  }
+
+  /// Get glow intensity based on form quality
+  double get _glowIntensity {
+    switch (formQuality) {
+      case FormQuality.good:
+        return 10.0; // Stronger glow for good form
+      case FormQuality.okay:
+        return 8.0;
+      case FormQuality.bad:
+        return 12.0; // Extra glow to make red visible
+      case FormQuality.neutral:
+        return 6.0;
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -21,25 +75,25 @@ class SkeletonPainter extends CustomPainter {
       return;
     }
 
-    // Paint for lines (Electric Cyan with glow)
+    // Paint for lines with form-based color
     final linePaint = Paint()
-      ..color = AppColors.electricCyan
+      ..color = _skeletonColor
       ..strokeWidth = 4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
 
-    // Paint for large joints (Cyber Lime with glow) - shoulders, hips
+    // Paint for large joints with form-based color
     final largeJointPaint = Paint()
-      ..color = AppColors.cyberLime
+      ..color = _jointColor
       ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity + 2);
 
-    // Paint for small joints (Electric Cyan with glow)
+    // Paint for small joints
     final smallJointPaint = Paint()
-      ..color = AppColors.electricCyan
+      ..color = _skeletonColor
       ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
 
     // Create a map for quick landmark lookup
     final Map<PoseLandmarkType, PoseLandmark> landmarkMap = {};
@@ -52,11 +106,9 @@ class SkeletonPainter extends CustomPainter {
       final landmark = landmarkMap[type];
       if (landmark == null) return null;
 
-      // Scale coordinates from image space to canvas space
       double x = landmark.x * size.width / imageSize.width;
       double y = landmark.y * size.height / imageSize.height;
 
-      // Mirror X for front camera (selfie mode)
       if (isFrontCamera) {
         x = size.width - x;
       }
@@ -109,13 +161,13 @@ class SkeletonPainter extends CustomPainter {
 
     // === DRAW JOINTS ===
 
-    // Large joints (Cyber Lime)
+    // Large joints
     drawJoint(PoseLandmarkType.leftShoulder, large: true);
     drawJoint(PoseLandmarkType.rightShoulder, large: true);
     drawJoint(PoseLandmarkType.leftHip, large: true);
     drawJoint(PoseLandmarkType.rightHip, large: true);
 
-    // Small joints (Electric Cyan)
+    // Small joints
     drawJoint(PoseLandmarkType.leftElbow);
     drawJoint(PoseLandmarkType.rightElbow);
     drawJoint(PoseLandmarkType.leftWrist);
@@ -125,12 +177,48 @@ class SkeletonPainter extends CustomPainter {
     drawJoint(PoseLandmarkType.leftAnkle);
     drawJoint(PoseLandmarkType.rightAnkle);
 
-    // Optional: Draw nose/head indicator
+    // Head
     drawJoint(PoseLandmarkType.nose, large: true);
+
+    // === OPTIONAL: Debug angle display ===
+    if (currentAngle != null) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: '${currentAngle!.toStringAsFixed(1)}°',
+          style: TextStyle(
+            color: _skeletonColor,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            shadows: [
+              Shadow(
+                color: _skeletonColor.withOpacity(0.8),
+                blurRadius: 10,
+              ),
+            ],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(20, size.height - 60));
+    }
   }
 
   @override
   bool shouldRepaint(SkeletonPainter oldDelegate) {
-    return oldDelegate.landmarks != landmarks;
+    return oldDelegate.landmarks != landmarks ||
+        oldDelegate.formQuality != formQuality ||
+        oldDelegate.currentAngle != currentAngle;
   }
+}
+
+// =============================================================================
+// HELPER: Convert form score (0-100) to FormQuality
+// =============================================================================
+
+FormQuality getFormQuality(double? formScore) {
+  if (formScore == null) return FormQuality.neutral;
+  if (formScore >= 80) return FormQuality.good;
+  if (formScore >= 50) return FormQuality.okay;
+  return FormQuality.bad;
 }
