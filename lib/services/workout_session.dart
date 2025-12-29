@@ -33,7 +33,7 @@ class WorkoutSession {
   double get formScore => _counter?.formScore ?? 0;
   String get feedback => _counter?.feedback ?? '';
   String get exerciseName => _currentExercise?.name ?? '';
-  String get phase => _counter?.phase.name ?? '';
+  String get phase => _counter?.state ?? '';
   
   /// Initialize the session
   Future<void> init() async {
