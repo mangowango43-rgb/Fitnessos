@@ -31,11 +31,12 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
   }
 
   Widget _buildMainScreen() {
-    return Column(
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -69,7 +70,8 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
         Expanded(
           child: _buildCategoryCards(),
         ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -287,11 +289,12 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
   Widget _buildPresetList() {
     final presets = _getPresetsForCategory();
 
-    return Column(
-      children: [
-        // Header with back button
-        Container(
-          padding: const EdgeInsets.all(20),
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header with back button
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
           child: Row(
             children: [
               GestureDetector(
@@ -341,7 +344,8 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
             ),
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 

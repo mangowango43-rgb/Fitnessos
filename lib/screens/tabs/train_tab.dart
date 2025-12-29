@@ -48,6 +48,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   String _feedback = '';
   double _formScore = 0;
   bool _showRepFlash = false;
+  bool _isRecording = false;
 
   @override
   void initState() {
@@ -591,29 +592,63 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // Bottom buttons
+        // Record button - Bottom Left
         Positioned(
           bottom: 40,
           left: 20,
-          right: 20,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: _finishSet,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cyberLime,
-                    borderRadius: BorderRadius.circular(16),
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _isRecording = !_isRecording;
+              });
+              // TODO: Implement video recording
+              print('🎥 Recording: $_isRecording');
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _isRecording ? AppColors.neonCrimson : Colors.black.withOpacity(0.7),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _isRecording ? AppColors.neonCrimson : AppColors.white30,
+                  width: 2,
+                ),
+                boxShadow: _isRecording ? [
+                  BoxShadow(
+                    color: AppColors.neonCrimson.withOpacity(0.5),
+                    blurRadius: 20,
                   ),
-                  child: const Text(
-                    'FINISH SET',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
-                  ),
+                ] : null,
+              ),
+              child: Icon(
+                _isRecording ? Icons.stop : Icons.fiber_manual_record,
+                color: _isRecording ? Colors.white : AppColors.white70,
+                size: 24,
+              ),
+            ),
+          ),
+        ),
+
+        // Bottom center button
+        Positioned(
+          bottom: 40,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: _finishSet,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.cyberLime,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Text(
+                  'FINISH SET',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ],

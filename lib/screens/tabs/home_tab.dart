@@ -14,9 +14,10 @@ class HomeTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lockedWorkout = ref.watch(lockedWorkoutProvider);
     
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100, left: 20, right: 20, top: 16),
-      child: Column(
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 100, left: 20, right: 20, top: 40),
+        child: Column(
         children: [
           // Locked Workout Card (if exists)
           if (lockedWorkout != null) ...[
@@ -39,6 +40,7 @@ class HomeTab extends ConsumerWidget {
           // Battle Logs
           _buildBattleLogs(),
         ],
+        ),
       ),
     );
   }
