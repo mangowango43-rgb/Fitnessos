@@ -41,14 +41,8 @@ class ExerciseRule {
 
 /// HOME - BODYWEIGHT BASICS - FULL BODY (7 exercises)
 /// 
-/// Exercises:
-/// 1. Push-Ups - 3x15 - Chest/Triceps
-/// 2. Air Squats - 3x20 - Legs
-/// 3. Lunges - 3x12 - Legs
-/// 4. Superman Raises - 3x15 - Back
-/// 5. Glute Bridge - 3x15 - Glutes
-/// 6. Plank - 3x45s - Core (isometric - special handling)
-/// 7. Mountain Climbers- 3x20 - Cardio/Core
+/// FIXED: Much more forgiving angles for real-world camera positions
+/// 
 class HomeFullBodyRules {
   
   // Landmark shortcuts
@@ -60,142 +54,119 @@ class HomeFullBodyRules {
   static const _ankle = PoseLandmarkType.rightAnkle;
 
   /// 1. PUSH-UPS
-  /// Track: Shoulder → Elbow → Wrist angle
-  /// Extended: ~160° (arms straight)
-  /// Contracted: ~90° (chest to floor)
-  /// Count when: Going DOWN (extended → contracted)
+  /// FIXED: extendedAngle 160→140, contractedAngle 90→120
+  /// This means: arms straight ~140°, bottom position ~120°
+  /// Much easier to hit from phone camera angle
   static const pushUps = ExerciseRule(
     id: 'pushups',
     name: 'Push-Ups',
     jointA: _shoulder,
     jointB: _elbow,
     jointC: _wrist,
-    extendedAngle: 160,
-    contractedAngle: 90,
+    extendedAngle: 140,     // WAS 160 - lowered so easier to "reset"
+    contractedAngle: 120,   // WAS 90 - raised so don't need to go as deep
     countOnContraction: true,
-    goodFormMin: 80,
-    goodFormMax: 100,
-    cueGood: "Perfect depth!",
-    cueBad: "Go lower!",
+    goodFormMin: 110,
+    goodFormMax: 130,
+    cueGood: "Good!",
+    cueBad: "Lower!",
   );
 
   /// 2. AIR SQUATS
-  /// Track: Hip → Knee → Ankle angle
-  /// Extended: ~170° (standing)
-  /// Contracted: ~90° (parallel squat)
-  /// Count when: Going UP (contracted → extended)
+  /// FIXED: More forgiving
   static const airSquats = ExerciseRule(
     id: 'air_squats',
     name: 'Air Squats',
     jointA: _hip,
     jointB: _knee,
     jointC: _ankle,
-    extendedAngle: 170,
-    contractedAngle: 90,
-    countOnContraction: false, // Count on the way UP
-    goodFormMin: 70,
-    goodFormMax: 100,
-    cueGood: "Great depth!",
-    cueBad: "Sit deeper!",
+    extendedAngle: 160,     // WAS 170
+    contractedAngle: 110,   // WAS 90 - don't need to go as deep
+    countOnContraction: false,
+    goodFormMin: 90,
+    goodFormMax: 120,
+    cueGood: "Nice!",
+    cueBad: "Deeper!",
   );
 
   /// 3. LUNGES
-  /// Track: Hip → Knee → Ankle angle (front leg)
-  /// Extended: ~170° (standing)
-  /// Contracted: ~90° (deep lunge)
-  /// Count when: Going UP
   static const lunges = ExerciseRule(
     id: 'lunges',
     name: 'Lunges',
     jointA: _hip,
     jointB: _knee,
     jointC: _ankle,
-    extendedAngle: 170,
-    contractedAngle: 90,
+    extendedAngle: 160,     // WAS 170
+    contractedAngle: 110,   // WAS 90
     countOnContraction: false,
-    goodFormMin: 80,
-    goodFormMax: 100,
-    cueGood: "Deep lunge!",
-    cueBad: "Knee to 90!",
+    goodFormMin: 100,
+    goodFormMax: 120,
+    cueGood: "Good lunge!",
+    cueBad: "Knee down!",
   );
 
   /// 4. SUPERMAN RAISES
-  /// Track: Shoulder → Hip → Knee angle (body extension)
-  /// Contracted: ~150° (lying flat)
-  /// Extended: ~180° (back arched, limbs up)
-  /// Count when: Going UP (lifting)
   static const supermanRaises = ExerciseRule(
     id: 'superman_raises',
     name: 'Superman Raises',
     jointA: _shoulder,
     jointB: _hip,
     jointC: _knee,
-    extendedAngle: 180,
-    contractedAngle: 150,
+    extendedAngle: 175,     // WAS 180
+    contractedAngle: 155,   // WAS 150
     countOnContraction: false,
-    goodFormMin: 170,
-    goodFormMax: 190,
-    cueGood: "Hold it!",
+    goodFormMin: 165,
+    goodFormMax: 180,
+    cueGood: "Hold!",
     cueBad: "Lift higher!",
   );
 
   /// 5. GLUTE BRIDGE
-  /// Track: Shoulder → Hip → Knee angle
-  /// Contracted: ~100° (hips down)
-  /// Extended: ~180° (hips up, body straight)
-  /// Count when: Going UP
   static const gluteBridge = ExerciseRule(
     id: 'glute_bridge',
     name: 'Glute Bridge',
     jointA: _shoulder,
     jointB: _hip,
     jointC: _knee,
-    extendedAngle: 180,
-    contractedAngle: 100,
+    extendedAngle: 170,     // WAS 180
+    contractedAngle: 110,   // WAS 100
     countOnContraction: false,
-    goodFormMin: 170,
-    goodFormMax: 190,
-    cueGood: "Squeeze glutes!",
-    cueBad: "Push hips up!",
+    goodFormMin: 160,
+    goodFormMax: 175,
+    cueGood: "Squeeze!",
+    cueBad: "Hips up!",
   );
 
-  /// 6. PLANK (Isometric - no reps, just hold detection)
-  /// Track: Shoulder → Hip → Ankle angle
-  /// Should be ~180° (straight line)
-  /// This is special - we don't count reps, just check form
+  /// 6. PLANK (Isometric)
   static const plank = ExerciseRule(
     id: 'plank',
     name: 'Plank',
     jointA: _shoulder,
     jointB: _hip,
     jointC: _ankle,
-    extendedAngle: 180,
-    contractedAngle: 160, // If hips sag below this, bad form
+    extendedAngle: 175,     // WAS 180
+    contractedAngle: 155,   // WAS 160
     countOnContraction: false,
-    goodFormMin: 170,
-    goodFormMax: 190,
-    cueGood: "Hold strong!",
+    goodFormMin: 165,
+    goodFormMax: 180,
+    cueGood: "Hold it!",
     cueBad: "Hips up!",
   );
 
   /// 7. MOUNTAIN CLIMBERS
-  /// Track: Hip → Knee → Ankle (alternating legs)
-  /// Extended: ~170° (leg back)
-  /// Contracted: ~60° (knee to chest)
-  /// Count when: Knee comes forward
   static const mountainClimbers = ExerciseRule(
     id: 'mountain_climbers',
     name: 'Mountain Climbers',
     jointA: _hip,
     jointB: _knee,
     jointC: _ankle,
-    extendedAngle: 170,
-    contractedAngle: 60,
+    extendedAngle: 155,     // WAS 170
+    contractedAngle: 80,    // WAS 60
     countOnContraction: true,
-    goodFormMin: 50,
-    goodFormMax: 70,
+    goodFormMin: 70,
+    goodFormMax: 100,
     cueGood: "Fast!",
-    cueBad: "Knee to chest!",
+    cueBad: "Knee up!",
   );
 
   /// Get rule by exercise ID
@@ -228,4 +199,3 @@ class HomeFullBodyRules {
   /// Check if we have a rule for this exercise
   static bool hasRule(String exerciseId) => getRule(exerciseId) != null;
 }
-
