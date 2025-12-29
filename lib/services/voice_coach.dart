@@ -1,8 +1,8 @@
-// import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 /// Simple voice coach that speaks cues with cooldown
 class VoiceCoach {
-  // final FlutterTts _tts = FlutterTts(); // Temporarily disabled
+  final FlutterTts _tts = FlutterTts();
   DateTime? _lastSpoke;
   static const _cooldown = Duration(seconds: 3);
   
@@ -11,11 +11,10 @@ class VoiceCoach {
   Future<void> init() async {
     if (_initialized) return;
     
-    // TTS temporarily disabled due to build issues
-    // await _tts.setLanguage('en-US');
-    // await _tts.setSpeechRate(0.5);
-    // await _tts.setVolume(1.0);
-    // await _tts.setPitch(1.1);
+    await _tts.setLanguage('en-US');
+    await _tts.setSpeechRate(0.5);
+    await _tts.setVolume(1.0);
+    await _tts.setPitch(1.1);
     
     _initialized = true;
   }
@@ -30,15 +29,15 @@ class VoiceCoach {
     }
     
     _lastSpoke = now;
-    // await _tts.speak(message); // TTS temporarily disabled
-    print('🗣️ TTS: $message'); // Debug output instead
+    await _tts.speak(message);
+    print('🗣️ TTS: $message'); // Debug output
   }
   
   /// Speak immediately (ignores cooldown) - for rep counts
   Future<void> speakNow(String message) async {
     if (!_initialized) await init();
-    // await _tts.speak(message); // TTS temporarily disabled
-    print('🗣️ TTS: $message'); // Debug output instead
+    await _tts.speak(message);
+    print('🗣️ TTS: $message'); // Debug output
     _lastSpoke = DateTime.now();
   }
   
@@ -69,7 +68,7 @@ class VoiceCoach {
   }
   
   Future<void> dispose() async {
-    // await _tts.stop(); // TTS temporarily disabled
+    await _tts.stop();
   }
 }
 

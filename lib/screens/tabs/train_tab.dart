@@ -540,10 +540,10 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             ),
           ),
 
-        // Form feedback
+        // Form feedback - Just above finish button
         if (_feedback.isNotEmpty)
           Positioned(
-            bottom: 200,
+            bottom: 120,
             left: 20,
             right: 20,
             child: Container(
