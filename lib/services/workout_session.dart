@@ -46,7 +46,7 @@ class WorkoutSession {
     required int sets,
     required int reps,
   }) async {
-    final rule = HomeFullBodyRules.getRule(exerciseId);
+    final rule = ExerciseRules.getRule(exerciseId);
     if (rule == null) {
       print('⚠️ No tracking rule for: $exerciseId');
       return;

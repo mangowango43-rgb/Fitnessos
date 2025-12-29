@@ -181,7 +181,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
     
     // Check if we have a tracking rule for this exercise
-    if (HomeFullBodyRules.hasRule(exercise.id)) {
+    if (ExerciseRules.hasRule(exercise.id)) {
       _session?.startExercise(
         exerciseId: exercise.id,
         sets: exercise.sets,
@@ -343,7 +343,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                         ),
                         const SizedBox(height: 8),
                         ..._lockedWorkout!.exercises.map((e) {
-                          final hasTracking = HomeFullBodyRules.hasRule(e.id);
+                          final hasTracking = ExerciseRules.hasRule(e.id);
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Row(
