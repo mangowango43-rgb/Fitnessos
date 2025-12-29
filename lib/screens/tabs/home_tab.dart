@@ -192,9 +192,9 @@ class HomeTab extends ConsumerWidget {
                 ),
                 const SizedBox(width: 10),
                 GestureDetector(
-                  onTap: () async {
-                    // Clear the locked workout
-                    await ref.read(lockedWorkoutProvider.notifier).clearLockedWorkout();
+                  onTap: () {
+                    // Navigate to workouts tab to edit/change workout
+                    DefaultTabController.of(context).animateTo(1);
                   },
                   child: Container(
                     padding: const EdgeInsets.all(12),
