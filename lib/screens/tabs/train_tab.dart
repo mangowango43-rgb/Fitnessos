@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math' show Random;
+import 'dart:math' show Random, min, max;
+import 'dart:math' show min, max;
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -354,7 +355,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         _skeletonState = SkeletonState.idle;
         _chargeProgress = 0.0;
         _powerGaugeFill = 0.0;
-      });
       });
       _startRest(); // Rest between exercises
     } else {
