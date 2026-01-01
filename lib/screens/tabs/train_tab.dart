@@ -10,9 +10,12 @@ import '../../utils/haptic_helper.dart';
 import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
+import '../../widgets/combo_counter.dart';
+import '../../widgets/shatter_animation.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
+import '../../models/rep_quality.dart';
 import '../../providers/workout_provider.dart';
 
 // NEW: Import the rep counting system
@@ -57,6 +60,12 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   SkeletonState _skeletonState = SkeletonState.idle;
   double _chargeProgress = 0.0;
   double _powerGaugeFill = 0.0;
+  
+  // GAMING FEATURES - Phase 2: Combo System
+  int _comboCount = 0;
+  int _maxCombo = 0;
+  RepQuality? _lastRepQuality;
+  bool _showShatterAnimation = false;
   
   // Screen shake animation
   late AnimationController _shakeController;
@@ -266,6 +275,35 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     
     _session!.onFeedback = (feedback) {
       setState(() => _feedback = feedback);
+    };
+
+    // GAMING: Combo callbacks
+    _session!.onComboChange = (combo, maxCombo) {
+      setState(() {
+        final oldCombo = _comboCount;
+        _comboCount = combo;
+        _maxCombo = maxCombo;
+        
+        // Check for combo break
+        if (oldCombo >= 3 && combo == 0) {
+          _showShatterAnimation = true;
+          HapticHelper.comboBreakHaptic();
+          
+          // Hide shatter after animation
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (mounted) setState(() => _showShatterAnimation = false);
+          });
+        }
+        
+        // Check for milestones (5X, 10X)
+        if (combo == 5 || combo == 10) {
+          HapticHelper.comboMilestoneHaptic();
+        }
+      });
+    };
+    
+    _session!.onRepQuality = (quality, score) {
+      setState(() => _lastRepQuality = quality);
     };
 
     setState(() {
@@ -576,6 +614,26 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           top: MediaQuery.of(context).size.height / 2 - 100, // Vertically centered
           child: PowerGauge(fillPercent: _powerGaugeFill),
         ),
+
+        // GAMING: Combo Counter - Top left
+        Positioned(
+          top: 100,
+          left: 16,
+          child: ComboCounter(
+            comboCount: _comboCount,
+            maxCombo: _maxCombo,
+          ),
+        ),
+
+        // GAMING: Shatter Animation - Full screen overlay
+        if (_showShatterAnimation)
+          Positioned.fill(
+            child: ShatterAnimation(
+              onComplete: () {
+                if (mounted) setState(() => _showShatterAnimation = false);
+              },
+            ),
+          ),
 
         // Exercise info - top left
         Positioned(

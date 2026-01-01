@@ -2,6 +2,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'exercise_rules.dart';
 import 'rep_counter.dart';
 import 'voice_coach.dart';
+import '../models/rep_quality.dart';
 
 /// Manages the active workout session
 /// Connects: Pose Detection → Rep Counter → Voice Coach
@@ -17,10 +18,22 @@ class WorkoutSession {
   bool _isActive = false;
   bool _isResting = false;
   
+  // GAMING: Combo tracking
+  int _currentCombo = 0;
+  int _maxCombo = 0;
+  int _comboBrokenCount = 0;
+  int _perfectReps = 0;
+  int _goodReps = 0;
+  int _missedReps = 0;
+  List<RepData> _repHistory = [];
+  DateTime? _setStartTime;
+  
   // Callbacks
   Function(int reps, double formScore)? onRepCounted;
   Function(String feedback)? onFeedback;
   Function(int setComplete, int totalSets)? onSetComplete;
+  Function(int combo, int maxCombo)? onComboChange;
+  Function(RepQuality quality, double formScore)? onRepQuality;
   
   // Getters
   bool get isActive => _isActive;
@@ -34,6 +47,14 @@ class WorkoutSession {
   String get feedback => _counter?.feedback ?? '';
   String get exerciseName => _currentExercise?.name ?? '';
   String get phase => _counter?.state ?? '';
+  
+  // GAMING: Combo getters
+  int get currentCombo => _currentCombo;
+  int get maxCombo => _maxCombo;
+  int get perfectReps => _perfectReps;
+  int get goodReps => _goodReps;
+  int get missedReps => _missedReps;
+  List<RepData> get repHistory => List.unmodifiable(_repHistory);
   
   /// Initialize the session
   Future<void> init() async {
@@ -60,6 +81,16 @@ class WorkoutSession {
     _isActive = true;
     _isResting = false;
     
+    // GAMING: Reset combo tracking for new exercise
+    _currentCombo = 0;
+    _maxCombo = 0;
+    _comboBrokenCount = 0;
+    _perfectReps = 0;
+    _goodReps = 0;
+    _missedReps = 0;
+    _repHistory = [];
+    _setStartTime = DateTime.now();
+    
     await _voice.announceExercise(rule.name, sets, reps);
   }
   
@@ -83,6 +114,48 @@ class WorkoutSession {
   void _onRepCompleted() {
     final reps = _counter!.repCount;
     final score = _counter!.formScore;
+    
+    // GAMING: Classify rep quality
+    final quality = classifyRep(score);
+    
+    // GAMING: Update combo
+    if (quality == RepQuality.perfect || quality == RepQuality.good) {
+      _currentCombo++;
+      if (_currentCombo > _maxCombo) {
+        _maxCombo = _currentCombo;
+      }
+    } else {
+      // Combo broken
+      if (_currentCombo >= 3) {
+        _comboBrokenCount++;
+      }
+      _currentCombo = 0;
+    }
+    
+    // GAMING: Track rep stats
+    switch (quality) {
+      case RepQuality.perfect:
+        _perfectReps++;
+        break;
+      case RepQuality.good:
+        _goodReps++;
+        break;
+      case RepQuality.miss:
+        _missedReps++;
+        break;
+    }
+    
+    // GAMING: Store rep data
+    _repHistory.add(RepData(
+      quality: quality,
+      formScore: score,
+      angle: _counter!.currentAngle,
+      timestamp: DateTime.now(),
+    ));
+    
+    // GAMING: Fire callbacks
+    onRepQuality?.call(quality, score);
+    onComboChange?.call(_currentCombo, _maxCombo);
     
     // Announce rep
     _voice.announceRep(reps);
