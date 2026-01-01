@@ -10,13 +10,24 @@ enum FormQuality {
   neutral, // Cyan - no exercise active / between reps
 }
 
+/// Skeleton state for gaming-style visual feedback
+enum SkeletonState {
+  idle,      // White - waiting for next rep
+  charging,  // Cyan - user descending into rep, lines thickening
+  perfect,   // Lime flash - perfect rep completed
+  error,     // Red - bad form detected
+}
+
 /// CustomPainter that draws a glowing cyber-themed skeleton overlay
 /// Color changes based on form quality during exercise
+/// NOW WITH GAMING FEATURES: Dynamic line thickness, state-based colors, perfect flash
 class SkeletonPainter extends CustomPainter {
   final List<PoseLandmark>? landmarks;
   final Size imageSize;
   final bool isFrontCamera;
   final FormQuality formQuality;
+  final SkeletonState skeletonState;
+  final double chargeProgress; // 0.0 to 1.0 - how deep into rep (for power gauge sync)
   final double? currentAngle; // Optional: display current angle for debugging
 
   SkeletonPainter({
@@ -24,48 +35,70 @@ class SkeletonPainter extends CustomPainter {
     required this.imageSize,
     this.isFrontCamera = true,
     this.formQuality = FormQuality.neutral,
+    this.skeletonState = SkeletonState.idle,
+    this.chargeProgress = 0.0,
     this.currentAngle,
   });
 
-  /// Get skeleton color based on form quality
+  /// Get skeleton color based on SKELETON STATE (for gaming feedback)
+  /// This overrides form quality when in special states
   Color get _skeletonColor {
-    switch (formQuality) {
-      case FormQuality.good:
-        return const Color(0xFF00FF66); // Bright Green
-      case FormQuality.okay:
-        return const Color(0xFFFFDD00); // Yellow/Gold
-      case FormQuality.bad:
-        return const Color(0xFFFF003C); // Neon Red (your Neon Crimson)
-      case FormQuality.neutral:
-        return AppColors.electricCyan; // Default cyan
+    // State-based colors take priority
+    switch (skeletonState) {
+      case SkeletonState.idle:
+        return AppColors.white70; // White when idle
+      case SkeletonState.charging:
+        return AppColors.electricCyan; // Cyan when charging
+      case SkeletonState.perfect:
+        return AppColors.cyberLime; // LIME FLASH on perfect rep
+      case SkeletonState.error:
+        return AppColors.neonCrimson; // Red on error
     }
   }
 
-  /// Get joint color based on form quality
+  /// Get joint color based on skeleton state
   Color get _jointColor {
-    switch (formQuality) {
-      case FormQuality.good:
-        return const Color(0xFF00FF66);
-      case FormQuality.okay:
-        return const Color(0xFFFFDD00);
-      case FormQuality.bad:
-        return const Color(0xFFFF003C);
-      case FormQuality.neutral:
+    switch (skeletonState) {
+      case SkeletonState.idle:
+        return AppColors.cyberLime.withOpacity(0.7);
+      case SkeletonState.charging:
         return AppColors.cyberLime;
+      case SkeletonState.perfect:
+        return AppColors.cyberLime; // LIME joints on perfect
+      case SkeletonState.error:
+        return AppColors.neonCrimson;
     }
   }
 
-  /// Get glow intensity based on form quality
+  /// Get glow intensity based on skeleton state
+  /// Charging state increases glow with chargeProgress
   double get _glowIntensity {
-    switch (formQuality) {
-      case FormQuality.good:
-        return 10.0; // Stronger glow for good form
-      case FormQuality.okay:
-        return 8.0;
-      case FormQuality.bad:
-        return 12.0; // Extra glow to make red visible
-      case FormQuality.neutral:
+    switch (skeletonState) {
+      case SkeletonState.idle:
         return 6.0;
+      case SkeletonState.charging:
+        // Glow intensifies as user goes deeper: 6px → 12px
+        return 6.0 + (chargeProgress * 6.0);
+      case SkeletonState.perfect:
+        return 14.0; // MAXIMUM GLOW on perfect flash
+      case SkeletonState.error:
+        return 10.0;
+    }
+  }
+
+  /// Get line width based on skeleton state
+  /// Lines thicken as user descends into rep
+  double get _lineWidth {
+    switch (skeletonState) {
+      case SkeletonState.idle:
+        return 2.0;
+      case SkeletonState.charging:
+        // Lines thicken from 2px → 4px as user goes deeper
+        return 2.0 + (chargeProgress * 2.0);
+      case SkeletonState.perfect:
+        return 4.0; // Thick lines on perfect
+      case SkeletonState.error:
+        return 3.0;
     }
   }
 
@@ -75,10 +108,10 @@ class SkeletonPainter extends CustomPainter {
       return;
     }
 
-    // Paint for lines with form-based color
+    // Paint for lines with state-based color and DYNAMIC WIDTH
     final linePaint = Paint()
       ..color = _skeletonColor
-      ..strokeWidth = 4
+      ..strokeWidth = _lineWidth // DYNAMIC: 2-4px based on state
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
@@ -208,6 +241,8 @@ class SkeletonPainter extends CustomPainter {
   bool shouldRepaint(SkeletonPainter oldDelegate) {
     return oldDelegate.landmarks != landmarks ||
         oldDelegate.formQuality != formQuality ||
+        oldDelegate.skeletonState != skeletonState ||
+        oldDelegate.chargeProgress != chargeProgress ||
         oldDelegate.currentAngle != currentAngle;
   }
 }
