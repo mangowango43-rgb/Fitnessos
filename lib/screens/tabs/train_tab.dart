@@ -12,6 +12,7 @@ import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
 import '../../widgets/combo_counter.dart';
 import '../../widgets/shatter_animation.dart';
+import '../../widgets/rep_quality_popup.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
@@ -66,6 +67,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   int _maxCombo = 0;
   RepQuality? _lastRepQuality;
   bool _showShatterAnimation = false;
+  bool _showRepQualityPopup = false;
   
   // Screen shake animation
   late AnimationController _shakeController;
@@ -303,7 +305,15 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     };
     
     _session!.onRepQuality = (quality, score) {
-      setState(() => _lastRepQuality = quality);
+      setState(() {
+        _lastRepQuality = quality;
+        _showRepQualityPopup = true;
+      });
+      
+      // Hide popup after animation
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _showRepQualityPopup = false);
+      });
     };
 
     setState(() {
