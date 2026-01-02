@@ -56,7 +56,8 @@ dependencies:
   camera: ^0.10.5+5
   google_mlkit_pose_detection: ^0.12.0
   permission_handler: ^11.0.1
-  
+  sensors_plus: ^6.0.1  # Gyroscope for dynamic calibration
+
   # Video Recording & Sharing
   share_plus: ^7.2.1
   video_player: ^2.8.1
