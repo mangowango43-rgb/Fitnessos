@@ -164,17 +164,38 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     if (_poseDetectorService == null || !_isWorkoutActive || _isResting) return;
 
     final landmarks = await _poseDetectorService!.detectPose(image);
-    
+
     if (landmarks != null && mounted) {
       setState(() => _landmarks = landmarks);
-      
+
       // NEW: Process pose through workout session
       _session?.processPose(landmarks);
-      
+
       // Update UI with session state
       setState(() {
         _feedback = _session?.feedback ?? '';
         _formScore = _session?.formScore ?? 0;
+
+        // GAMING: Update skeleton state and power gauge based on rep phase
+        final repState = _session?.repState;
+        final chargeProgress = _session?.chargeProgress ?? 0.0;
+
+        if (repState == RepState.goingDown || repState == RepState.down) {
+          // User is descending - CHARGING state
+          _skeletonState = SkeletonState.charging;
+          _chargeProgress = chargeProgress;
+          _powerGaugeFill = chargeProgress;
+        } else if (repState == RepState.goingUp) {
+          // User is ascending - IDLE state (or keep charging visual briefly)
+          _skeletonState = SkeletonState.idle;
+          // Keep power gauge filled briefly during ascent
+          _powerGaugeFill = chargeProgress;
+        } else {
+          // At rest position
+          _skeletonState = SkeletonState.idle;
+          _chargeProgress = 0.0;
+          _powerGaugeFill = 0.0;
+        }
       });
     }
   }

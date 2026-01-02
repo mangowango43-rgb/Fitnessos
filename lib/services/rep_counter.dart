@@ -72,6 +72,21 @@ class RepCounter {
   String get feedback => _feedback;
   String get state => _state.name;
   bool get isCalibrating => _isCalibrating;
+  RepState get repState => _state;
+
+  /// GAMING: Get charge progress (0.0 to 1.0) - how far into the rep descent
+  /// Returns 1.0 when at full depth, 0.0 when at top
+  double get chargeProgress {
+    if (_state == RepState.up) return 0.0;
+
+    // Calculate progress from top to bottom
+    final range = _upThreshold - _downThreshold;
+    if (range <= 0) return 0.0;
+
+    // How far from top threshold?
+    final progress = (_upThreshold - _currentAngle) / range;
+    return progress.clamp(0.0, 1.0);
+  }
   
   /// Start calibration mode - next rep sets the target depth
   void startCalibration() {

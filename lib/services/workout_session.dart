@@ -4,6 +4,9 @@ import 'rep_counter.dart';
 import 'voice_coach.dart';
 import '../models/rep_quality.dart';
 
+// Export RepState for UI access
+export 'rep_counter.dart' show RepState;
+
 /// Manages the active workout session
 /// Connects: Pose Detection → Rep Counter → Voice Coach
 class WorkoutSession {
@@ -47,7 +50,7 @@ class WorkoutSession {
   String get feedback => _counter?.feedback ?? '';
   String get exerciseName => _currentExercise?.name ?? '';
   String get phase => _counter?.state ?? '';
-  
+
   // GAMING: Combo getters
   int get currentCombo => _currentCombo;
   int get maxCombo => _maxCombo;
@@ -55,6 +58,10 @@ class WorkoutSession {
   int get goodReps => _goodReps;
   int get missedReps => _missedReps;
   List<RepData> get repHistory => List.unmodifiable(_repHistory);
+
+  // GAMING: Real-time charge progress for power gauge and skeleton state
+  double get chargeProgress => _counter?.chargeProgress ?? 0.0;
+  RepState? get repState => _counter?.repState;
   
   /// Initialize the session
   Future<void> init() async {
