@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/haptic_helper.dart';
 import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
+import '../../widgets/power_gauge.dart';
+import '../../widgets/combo_counter.dart';
+import '../../widgets/shatter_animation.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
+import '../../models/rep_quality.dart';
 import '../../providers/workout_provider.dart';
 
 // NEW: Import the rep counting system
@@ -50,10 +56,34 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   bool _showRepFlash = false;
   bool _isRecording = false;
 
+  // GAMING FEATURES
+  SkeletonState _skeletonState = SkeletonState.idle;
+  double _chargeProgress = 0.0;
+  double _powerGaugeFill = 0.0;
+  int _comboCount = 0;
+  int _maxCombo = 0;
+  RepQuality? _lastRepQuality;
+  bool _showShatterAnimation = false;
+  
+  // Screen shake animation
+  late AnimationController _shakeController;
+  late Animation<Offset> _shakeAnimation;
+  final math.Random _random = math.Random();
+
   @override
   void initState() {
     super.initState();
     _loadLockedWorkout();
+    
+    // Initialize screen shake controller
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+    );
+    _shakeAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset.zero,
+    ).animate(_shakeController);
   }
 
   @override
@@ -62,6 +92,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _cameraController?.dispose();
     _poseDetectorService?.dispose();
     _session?.dispose();
+    _shakeController.dispose();
     super.dispose();
   }
 
