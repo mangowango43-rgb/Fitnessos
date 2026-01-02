@@ -180,8 +180,21 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         // GAMING: Update skeleton state and power gauge based on rep phase
         final repState = _session?.repState;
         final chargeProgress = _session?.chargeProgress ?? 0.0;
+        
+        // Check for bad form feedback
+        final hasBadFormFeedback = _feedback.isNotEmpty && 
+                                   (_feedback.contains('!') || 
+                                    _feedback.contains('Keep') || 
+                                    _feedback.contains('Don') ||
+                                    _feedback.contains('deeper') ||
+                                    _feedback.contains('higher'));
 
-        if (repState == RepState.goingDown || repState == RepState.down) {
+        if (hasBadFormFeedback && _formScore < 70) {
+          // BAD FORM DETECTED - Turn skeleton RED
+          _skeletonState = SkeletonState.error;
+          _chargeProgress = chargeProgress;
+          _powerGaugeFill = chargeProgress;
+        } else if (repState == RepState.goingDown || repState == RepState.down) {
           // User is descending - CHARGING state
           _skeletonState = SkeletonState.charging;
           _chargeProgress = chargeProgress;
