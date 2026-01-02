@@ -21,19 +21,39 @@ android {
 
     defaultConfig {
         applicationId = "com.fitnessos.app"
-        minSdk = 21
+        minSdk = 24  // Raised to 24 for ML Kit Pose Detection stability
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Multidex support for ML Kit
+        multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // ProGuard rules for ML Kit and performance optimization
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // Ensure Java 11 bytecode compatibility
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
+}
+
+dependencies {
+    // Multidex support
+    implementation("androidx.multidex:multidex:2.0.1")
+
+    // Core library desugaring for Java 11 features
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
 flutter {
