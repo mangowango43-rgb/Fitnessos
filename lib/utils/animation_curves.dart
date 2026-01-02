@@ -8,7 +8,7 @@ class ElasticOutCurve extends Curve {
   @override
   double transformInternal(double t) {
     const double s = 0.3;
-    return pow(2, -10 * t) * sin((t - s / 4) * (2 * pi) / s) + 1;
+    return (pow(2, -10 * t) * sin((t - s / 4) * (2 * pi) / s) + 1).toDouble();
   }
 }
 
@@ -35,7 +35,7 @@ class SmoothChargeCurve extends Curve {
 }
 
 /// Export custom curves
-const Curve elasticOut = ElasticOutCurve();
-const Curve sharpPeak = SharpPeakCurve();
-const Curve smoothCharge = SmoothChargeCurve();
+final Curve elasticOut = ElasticOutCurve();
+final Curve sharpPeak = SharpPeakCurve();
+final Curve smoothCharge = SmoothChargeCurve();
 

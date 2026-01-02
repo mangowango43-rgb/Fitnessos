@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math' show Random, min, max;
+import 'dart:math' as math;
+import 'dart:math' show Random;
 import 'dart:math' show min, max;
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,7 +13,6 @@ import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
 import '../../widgets/combo_counter.dart';
-import '../../widgets/shatter_animation.dart';
 import '../../widgets/rep_quality_popup.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
@@ -187,7 +187,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         final progress = _calculateChargeProgress(currentAngle, rule);
         
         // Update skeleton state based on rep phase
-        final repPhase = _session?.state ?? 'idle';
+        final repPhase = _session?.phase ?? 'idle';
         
         setState(() {
           _chargeProgress = progress;
@@ -436,8 +436,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     
     // Clamp angle to valid range
     final clampedAngle = currentAngle.clamp(
-      contractedAngle.min(extendedAngle),
-      contractedAngle.max(extendedAngle),
+      math.min(contractedAngle, extendedAngle),
+      math.max(contractedAngle, extendedAngle),
     );
     
     // Calculate progress
@@ -912,6 +912,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ],
         ),
       ),
-    ),
+      ),
   }
 }
