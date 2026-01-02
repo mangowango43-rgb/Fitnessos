@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:math' show Random;
-import 'dart:math' show min, max;
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,12 +10,9 @@ import '../../utils/haptic_helper.dart';
 import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
-import '../../widgets/combo_counter.dart';
-import '../../widgets/rep_quality_popup.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
-import '../../models/rep_quality.dart';
 import '../../providers/workout_provider.dart';
 
 // NEW: Import the rep counting system
@@ -62,13 +57,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   SkeletonState _skeletonState = SkeletonState.idle;
   double _chargeProgress = 0.0;
   double _powerGaugeFill = 0.0;
-  
-  // GAMING FEATURES - Phase 2: Combo System
-  int _comboCount = 0;
-  int _maxCombo = 0;
-  RepQuality? _lastRepQuality;
-  bool _showShatterAnimation = false;
-  bool _showRepQualityPopup = false;
   
   // Screen shake animation
   late AnimationController _shakeController;
@@ -187,7 +175,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         final progress = _calculateChargeProgress(currentAngle, rule);
         
         // Update skeleton state based on rep phase
-        final repPhase = _session?.phase ?? 'idle';
+        final repPhase = _session?.state ?? 'idle';
         
         setState(() {
           _chargeProgress = progress;
@@ -280,43 +268,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       setState(() => _feedback = feedback);
     };
 
-    // GAMING: Combo callbacks
-    _session!.onComboChange = (combo, maxCombo) {
-      setState(() {
-        final oldCombo = _comboCount;
-        _comboCount = combo;
-        _maxCombo = maxCombo;
-        
-        // Check for combo break
-        if (oldCombo >= 3 && combo == 0) {
-          _showShatterAnimation = true;
-          HapticHelper.comboBreakHaptic();
-          
-          // Hide shatter after animation
-          Future.delayed(const Duration(milliseconds: 600), () {
-            if (mounted) setState(() => _showShatterAnimation = false);
-          });
-        }
-        
-        // Check for milestones (5X, 10X)
-        if (combo == 5 || combo == 10) {
-          HapticHelper.comboMilestoneHaptic();
-        }
-      });
-    };
-    
-    _session!.onRepQuality = (quality, score) {
-      setState(() {
-        _lastRepQuality = quality;
-        _showRepQualityPopup = true;
-      });
-      
-      // Hide popup after animation
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) setState(() => _showRepQualityPopup = false);
-      });
-    };
-
     setState(() {
       _isWorkoutActive = true;
       _currentExerciseIndex = 0;
@@ -355,6 +306,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         _skeletonState = SkeletonState.idle;
         _chargeProgress = 0.0;
         _powerGaugeFill = 0.0;
+      });
       });
       _startRest(); // Rest between exercises
     } else {
@@ -436,8 +388,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     
     // Clamp angle to valid range
     final clampedAngle = currentAngle.clamp(
-      math.min(contractedAngle, extendedAngle),
-      math.max(contractedAngle, extendedAngle),
+      contractedAngle.min(extendedAngle),
+      contractedAngle.max(extendedAngle),
     );
     
     // Calculate progress
@@ -624,26 +576,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           top: MediaQuery.of(context).size.height / 2 - 100, // Vertically centered
           child: PowerGauge(fillPercent: _powerGaugeFill),
         ),
-
-        // GAMING: Combo Counter - Top left
-        Positioned(
-          top: 100,
-          left: 16,
-          child: ComboCounter(
-            comboCount: _comboCount,
-            maxCombo: _maxCombo,
-          ),
-        ),
-
-        // GAMING: Shatter Animation - Full screen overlay
-        if (_showShatterAnimation)
-          Positioned.fill(
-            child: ShatterAnimation(
-              onComplete: () {
-                if (mounted) setState(() => _showShatterAnimation = false);
-              },
-            ),
-          ),
 
         // Exercise info - top left
         Positioned(
@@ -911,9 +843,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             ),
           ],
         ),
-          ],
-        ),
       ),
+    ),
     );
   }
 }
