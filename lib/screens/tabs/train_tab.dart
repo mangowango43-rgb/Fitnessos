@@ -13,6 +13,7 @@ import '../../widgets/combo_counter.dart';
 import '../../widgets/shatter_animation.dart';
 import '../../widgets/tactical_countdown.dart';
 import '../../widgets/tactical_hud.dart';
+import '../../widgets/phone_position_guide.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
@@ -70,6 +71,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   bool _showCountdown = false;
   bool _bodyDetected = false;
   bool _countdownComplete = false;
+  bool _showPhoneGuide = false;
+  int _countdownValue = 5;
+  Timer? _countdownTimer;
 
   @override
   void initState() {
@@ -80,6 +84,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   @override
   void dispose() {
     _restTimer?.cancel();
+    _countdownTimer?.cancel();
     _cameraController?.dispose();
     _poseDetectorService?.dispose();
     _session?.dispose();
@@ -137,9 +142,29 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     final landmarks = await _poseDetectorService!.detectPose(image);
 
     if (landmarks != null && mounted) {
-      // Body detected!
-      if (!_bodyDetected) {
-        setState(() => _bodyDetected = true);
+      // Check if body is in frame (for countdown detection)
+      final hasLeftShoulder = landmarks.any((l) => l.type == PoseLandmarkType.leftShoulder);
+      final hasRightShoulder = landmarks.any((l) => l.type == PoseLandmarkType.rightShoulder);
+      final hasLeftHip = landmarks.any((l) => l.type == PoseLandmarkType.leftHip);
+      final hasRightHip = landmarks.any((l) => l.type == PoseLandmarkType.rightHip);
+      
+      final wasBodyDetected = _bodyDetected;
+      final bodyInFrame = hasLeftShoulder && hasRightShoulder && hasLeftHip && hasRightHip;
+      
+      // Update body detection status
+      if (bodyInFrame != _bodyDetected) {
+        setState(() => _bodyDetected = bodyInFrame);
+      }
+      
+      // Start countdown when body first detected during countdown phase
+      if (_showCountdown && bodyInFrame && !wasBodyDetected) {
+        _startCountdownTimer();
+      }
+      
+      // Reset countdown if body lost during countdown
+      if (_showCountdown && !bodyInFrame && wasBodyDetected) {
+        _countdownTimer?.cancel();
+        setState(() => _countdownValue = 5);
       }
       
       // Only process workout if countdown complete
@@ -184,14 +209,29 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   Future<void> _startWorkout() async {
     if (_lockedWorkout == null || _lockedWorkout!.exercises.isEmpty) return;
 
-    // Initialize camera first
+    // Step 1: Show phone positioning guide
+    setState(() {
+      _showPhoneGuide = true;
+    });
+  }
+  
+  void _onPhoneGuideComplete() {
+    setState(() {
+      _showPhoneGuide = false;
+    });
+    _continueToCountdown();
+  }
+  
+  Future<void> _continueToCountdown() async {
+    // Step 2: Initialize camera
     await _initializeCamera();
     
-    // Show countdown overlay
+    // Step 3: Show countdown screen (waiting for body detection)
     setState(() {
       _showCountdown = true;
       _bodyDetected = false;
       _countdownComplete = false;
+      _countdownValue = 5;
     });
     
     // Initialize workout session
@@ -200,6 +240,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     
     // Set up callbacks
     _session!.onRepCounted = (reps, score) {
+      print('🎯 REP COMPLETED: Rep $reps with score $score');
+      
       setState(() {
         _showRepFlash = true;
         _formScore = score;
@@ -208,15 +250,18 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         _skeletonState = SkeletonState.perfect;
       });
       
-      // Trigger haptic based on form score (removed shake)
+      // Trigger haptic based on form score
       if (score >= 85) {
         // PERFECT REP
+        print('📳 Triggering PERFECT haptic');
         HapticHelper.perfectRepHaptic();
       } else if (score >= 60) {
         // GOOD REP
+        print('📳 Triggering GOOD haptic');
         HapticHelper.goodRepHaptic();
       } else {
         // MISSED REP
+        print('📳 Triggering MISSED haptic');
         HapticHelper.missedRepHaptic();
       }
       
@@ -285,6 +330,65 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _startCurrentExercise();
   }
 
+
+  void _startCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      setState(() {
+        _countdownValue--;
+      });
+      
+      if (_countdownValue <= 0) {
+        timer.cancel();
+        _finishCountdownAndStartWorkout();
+      }
+    });
+  }
+
+  void _finishCountdownAndStartWorkout() {
+    setState(() {
+      _showCountdown = false;
+      _countdownComplete = true;
+      _isWorkoutActive = true;
+      _currentExerciseIndex = 0;
+    });
+
+    // Start first exercise
+    _startCurrentExercise();
+  }
+
+  void _advanceToNextExercise() {
+    if (_lockedWorkout == null) return;
+    
+    if (_currentExerciseIndex < _lockedWorkout!.exercises.length - 1) {
+      // More exercises remaining
+      setState(() {
+        _currentExerciseIndex++;
+      });
+      print('▶️ Starting exercise ${_currentExerciseIndex + 1}: ${_lockedWorkout!.exercises[_currentExerciseIndex].name}');
+      _startCurrentExercise();
+    } else {
+      // ALL EXERCISES COMPLETE - Workout done!
+      print('🏆 WORKOUT COMPLETE!');
+      _completeWorkout();
+    }
+  }
+
+  void _completeWorkout() {
+    // Play completion haptic
+    HapticHelper.workoutCompleteHaptic();
+    
+    // End the workout
+    _endWorkout();
+    
+    // TODO: Show completion stats modal
+  }
+
   void _startCurrentExercise() {
     if (_lockedWorkout == null) return;
     
@@ -313,7 +417,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _startRest(); // Rest between exercises
     } else {
       // Workout complete!
-      _endWorkout();
+      _completeWorkout();
     }
   }
 
@@ -337,12 +441,19 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _restTimer?.cancel();
     setState(() => _isResting = false);
     
-    // Start next set or next exercise
-    if ((_session?.currentSet ?? 0) < (_session?.targetSets ?? 0)) {
+    // Check if we need to do more sets of current exercise
+    final currentSet = _session?.currentSet ?? 0;
+    final targetSets = _session?.targetSets ?? 0;
+    
+    print('🔄 END REST: Set $currentSet of $targetSets');
+    
+    if (currentSet < targetSets) {
+      // More sets to go for THIS exercise
       _session?.startNextSet();
     } else {
-      // All sets complete - move to next exercise
-      _nextExercise();
+      // All sets complete for this exercise - MOVE TO NEXT
+      print('✅ Exercise complete, moving to next');
+      _advanceToNextExercise();
     }
   }
 
@@ -376,6 +487,27 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    // Step 1: Show phone positioning guide
+    if (_showPhoneGuide) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: PhonePositionGuide(
+              onContinue: _onPhoneGuideComplete,
+              exerciseName: _lockedWorkout?.exercises.first.name ?? 'Exercise',
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Step 2: Show countdown screen (waiting for body detection)
+    if (_showCountdown) {
+      return _buildCountdownScreen();
+    }
+    
     if (!_isWorkoutActive) {
       return _buildStartScreen();
     }
@@ -385,6 +517,124 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     }
 
     return _buildTrainingScreen();
+  }
+
+
+  Widget _buildCountdownScreen() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Camera preview
+          if (_cameraController != null && _isCameraInitialized)
+            Positioned.fill(
+              child: CameraPreview(_cameraController!),
+            ),
+          
+          // Skeleton overlay (shows body detection)
+          if (_landmarks != null && _cameraController != null)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: SkeletonPainter(
+                  landmarks: _landmarks,
+                  imageSize: Size(
+                    _cameraController!.value.previewSize!.height,
+                    _cameraController!.value.previewSize!.width,
+                  ),
+                  isFrontCamera: true,
+                  skeletonState: SkeletonState.idle,
+                  chargeProgress: 0.0,
+                ),
+              ),
+            ),
+          
+          // Dark overlay
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.6),
+            ),
+          ),
+          
+          // Countdown content
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Status text
+                Text(
+                  _bodyDetected ? 'GET READY' : 'STEP INTO FRAME',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.cyberLime,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                
+                // Countdown number or body icon
+                if (_bodyDetected)
+                  Text(
+                    '$_countdownValue',
+                    style: TextStyle(
+                      fontSize: 120,
+                      fontWeight: FontWeight.w900,
+                      color: _countdownValue <= 3 
+                          ? AppColors.neonCrimson 
+                          : AppColors.electricCyan,
+                      shadows: [
+                        Shadow(
+                          color: (_countdownValue <= 3 
+                              ? AppColors.neonCrimson 
+                              : AppColors.electricCyan).withOpacity(0.8),
+                          blurRadius: 30,
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.accessibility_new,
+                    size: 120,
+                    color: AppColors.white30,
+                  ),
+                
+                const SizedBox(height: 40),
+                
+                // Instructions
+                Text(
+                  _bodyDetected 
+                      ? 'Hold position...'
+                      : 'Position your whole body in camera view',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: AppColors.white70,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          
+          // Cancel button
+          Positioned(
+            top: 60,
+            left: 20,
+            child: IconButton(
+              onPressed: () {
+                _countdownTimer?.cancel();
+                setState(() {
+                  _showCountdown = false;
+                  _isWorkoutActive = false;
+                });
+                _endWorkout();
+              },
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStartScreen() {

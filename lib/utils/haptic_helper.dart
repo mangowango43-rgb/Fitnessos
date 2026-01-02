@@ -2,62 +2,85 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 
 /// Platform-safe haptic feedback helper
-/// Provides different haptic intensities for various workout events
+/// Uses multiple fallback methods for maximum compatibility
 class HapticHelper {
   /// Perfect rep completed - HEAVY impact
   static Future<void> perfectRepHaptic() async {
-    if (_isHapticSupported()) {
-      await HapticFeedback.heavyImpact();
-    }
+    await _triggerHaptic(HapticType.heavy);
   }
 
   /// Good rep completed - MEDIUM impact
   static Future<void> goodRepHaptic() async {
-    if (_isHapticSupported()) {
-      await HapticFeedback.mediumImpact();
-    }
+    await _triggerHaptic(HapticType.medium);
   }
 
   /// Missed rep or bad form - LIGHT impact
   static Future<void> missedRepHaptic() async {
-    if (_isHapticSupported()) {
-      await HapticFeedback.lightImpact();
-    }
+    await _triggerHaptic(HapticType.light);
   }
 
   /// Combo break - VIBRATE (error feel)
   static Future<void> comboBreakHaptic() async {
-    if (_isHapticSupported()) {
-      await HapticFeedback.vibrate();
-    }
+    await _triggerHaptic(HapticType.vibrate);
   }
 
   /// Combo milestone reached (5X, 10X) - Selection click
   static Future<void> comboMilestoneHaptic() async {
-    if (_isHapticSupported()) {
-      await HapticFeedback.selectionClick();
-    }
+    await _triggerHaptic(HapticType.selection);
   }
 
   /// Set complete - HEAVY impact
   static Future<void> setCompleteHaptic() async {
-    if (_isHapticSupported()) {
-      await HapticFeedback.heavyImpact();
-    }
+    await _triggerHaptic(HapticType.heavy);
   }
 
   /// Workout complete - DOUBLE HEAVY impact
   static Future<void> workoutCompleteHaptic() async {
-    if (_isHapticSupported()) {
-      await HapticFeedback.heavyImpact();
-      await Future.delayed(const Duration(milliseconds: 100));
-      await HapticFeedback.heavyImpact();
-    }
+    await _triggerHaptic(HapticType.heavy);
+    await Future.delayed(const Duration(milliseconds: 150));
+    await _triggerHaptic(HapticType.heavy);
   }
 
-  /// Check if platform supports haptics
-  static bool _isHapticSupported() {
-    return Platform.isIOS || Platform.isAndroid;
+  /// Core haptic trigger with multiple fallbacks
+  static Future<void> _triggerHaptic(HapticType type) async {
+    if (!Platform.isIOS && !Platform.isAndroid) return;
+
+    try {
+      switch (type) {
+        case HapticType.heavy:
+          await HapticFeedback.heavyImpact();
+          break;
+        case HapticType.medium:
+          await HapticFeedback.mediumImpact();
+          break;
+        case HapticType.light:
+          await HapticFeedback.lightImpact();
+          break;
+        case HapticType.selection:
+          await HapticFeedback.selectionClick();
+          break;
+        case HapticType.vibrate:
+          await HapticFeedback.vibrate();
+          break;
+      }
+      print('📳 Haptic triggered: $type');
+    } catch (e) {
+      // Fallback to basic vibrate if specific haptic fails
+      print('⚠️ Haptic fallback for $type: $e');
+      try {
+        await HapticFeedback.vibrate();
+      } catch (_) {
+        // Device doesn't support haptics at all
+        print('❌ No haptic support on this device');
+      }
+    }
   }
 }
 
+enum HapticType {
+  heavy,
+  medium,
+  light,
+  selection,
+  vibrate,
+}

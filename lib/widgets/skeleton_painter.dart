@@ -86,19 +86,18 @@ class SkeletonPainter extends CustomPainter {
     }
   }
 
-  /// Get line width based on skeleton state
-  /// Lines thicken as user descends into rep
+  /// Get line width - INCREASED for visibility (SOLID LINES)
   double get _lineWidth {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return 2.0;
+        return 4.0; // Was 2.0 - NOW THICKER
       case SkeletonState.charging:
-        // Lines thicken from 2px → 4px as user goes deeper
-        return 2.0 + (chargeProgress * 2.0);
+        // Lines thicken from 4px → 6px as user goes deeper
+        return 4.0 + (chargeProgress * 2.0);
       case SkeletonState.perfect:
-        return 4.0; // Thick lines on perfect
+        return 6.0; // Was 4.0 - THICKER for perfect flash
       case SkeletonState.error:
-        return 3.0;
+        return 5.0; // Was 3.0
     }
   }
 
@@ -108,25 +107,25 @@ class SkeletonPainter extends CustomPainter {
       return;
     }
 
-    // Paint for lines with state-based color and DYNAMIC WIDTH
+    // SOLID LINES - REMOVED blur for maximum visibility
     final linePaint = Paint()
       ..color = _skeletonColor
-      ..strokeWidth = _lineWidth // DYNAMIC: 2-4px based on state
+      ..strokeWidth = _lineWidth // THICKER: 4-6px
       ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
+      ..strokeCap = StrokeCap.round;
+      // REMOVED: ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
 
-    // Paint for large joints with form-based color
+    // SOLID joints - REMOVED blur
     final largeJointPaint = Paint()
       ..color = _jointColor
-      ..style = PaintingStyle.fill
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity + 2);
+      ..style = PaintingStyle.fill;
+      // REMOVED: ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity + 2);
 
-    // Paint for small joints
+    // SOLID small joints - REMOVED blur
     final smallJointPaint = Paint()
       ..color = _skeletonColor
-      ..style = PaintingStyle.fill
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
+      ..style = PaintingStyle.fill;
+      // REMOVED: ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
 
     // Create a map for quick landmark lookup
     final Map<PoseLandmarkType, PoseLandmark> landmarkMap = {};
