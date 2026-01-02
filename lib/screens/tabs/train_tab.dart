@@ -174,7 +174,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
 
       setState(() {
         _landmarks = landmarks;
-        _feedback = _session?.feedback ?? '';
+        // _feedback removed - voice coach handles feedback now
         _formScore = _session?.formScore ?? 0;
 
         // GAMING: Update skeleton state and power gauge based on rep phase
@@ -1039,31 +1039,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             ),
           ),
 
-        // Form feedback - Just above finish button
-        if (_feedback.isNotEmpty)
-          Positioned(
-            bottom: 120,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _formScore >= 80 
-                    ? AppColors.cyberLime.withOpacity(0.9)
-                    : AppColors.neonCrimson.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _feedback,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
+        // Text feedback REMOVED - voice coach handles all feedback now
+        // Screen shows: camera, skeleton, power gauge, combo counter, rep counter only
 
         // Debug info - current angle and phase
         Positioned(
