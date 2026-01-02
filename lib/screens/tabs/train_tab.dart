@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math' show Random;
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/app_colors.dart';
-import '../../utils/haptic_helper.dart';
 import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
-import '../../widgets/power_gauge.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
@@ -53,30 +50,10 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   bool _showRepFlash = false;
   bool _isRecording = false;
 
-  // GAMING FEATURES - Phase 1
-  SkeletonState _skeletonState = SkeletonState.idle;
-  double _chargeProgress = 0.0;
-  double _powerGaugeFill = 0.0;
-  
-  // Screen shake animation
-  late AnimationController _shakeController;
-  late Animation<Offset> _shakeAnimation;
-  final Random _random = Random();
-
   @override
   void initState() {
     super.initState();
     _loadLockedWorkout();
-    
-    // Initialize screen shake controller
-    _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 100),
-      vsync: this,
-    );
-    _shakeAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset.zero,
-    ).animate(_shakeController);
   }
 
   @override
@@ -85,7 +62,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _cameraController?.dispose();
     _poseDetectorService?.dispose();
     _session?.dispose();
-    _shakeController.dispose();
     super.dispose();
   }
 
@@ -94,25 +70,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     setState(() {
       _lockedWorkout = lockedWorkout;
     });
-  }
-
-  /// Trigger screen shake effect (for perfect reps)
-  void _triggerScreenShake() {
-    // Generate random offset for shake (3-5px)
-    final dx = (_random.nextDouble() * 10 - 5) / MediaQuery.of(context).size.width;
-    final dy = (_random.nextDouble() * 10 - 5) / MediaQuery.of(context).size.height;
-    
-    _shakeAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset(dx, dy),
-    ).animate(CurvedAnimation(
-      parent: _shakeController,
-      curve: Curves.elasticOut,
-    ));
-    
-    _shakeController
-      ..reset()
-      ..forward();
   }
 
   Future<void> _initializeCamera() async {
@@ -164,42 +121,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       // NEW: Process pose through workout session
       _session?.processPose(landmarks);
       
-      // Calculate charge progress and update skeleton state
-      final currentAngle = _session?.currentAngle ?? 0;
-      final currentExercise = _getCurrentExercise();
-      
-      if (currentExercise != null && ExerciseRules.hasRule(currentExercise.id)) {
-        final rule = ExerciseRules.getRule(currentExercise.id)!;
-        
-        // Calculate how deep into the rep (0.0 = extended, 1.0 = fully contracted)
-        final progress = _calculateChargeProgress(currentAngle, rule);
-        
-        // Update skeleton state based on rep phase
-        final repPhase = _session?.state ?? 'idle';
-        
-        setState(() {
-          _chargeProgress = progress;
-          _powerGaugeFill = progress;
-          
-          // Update skeleton state
-          if (_skeletonState == SkeletonState.perfect) {
-            // Don't interrupt perfect flash
-            return;
-          }
-          
-          if (repPhase == 'extending' || repPhase == 'contracting') {
-            _skeletonState = SkeletonState.charging;
-          } else {
-            _skeletonState = SkeletonState.idle;
-          }
-          
-          // Check for bad form
-          if (_formScore > 0 && _formScore < 50) {
-            _skeletonState = SkeletonState.error;
-          }
-        });
-      }
-      
       // Update UI with session state
       setState(() {
         _feedback = _session?.feedback ?? '';
@@ -223,34 +144,11 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       setState(() {
         _showRepFlash = true;
         _formScore = score;
-        
-        // GAMING: Flash skeleton to PERFECT state
-        _skeletonState = SkeletonState.perfect;
       });
       
-      // Trigger haptic and shake based on form score
-      if (score >= 85) {
-        // PERFECT REP
-        HapticHelper.perfectRepHaptic();
-        _triggerScreenShake();
-      } else if (score >= 60) {
-        // GOOD REP
-        HapticHelper.goodRepHaptic();
-      } else {
-        // MISSED REP
-        HapticHelper.missedRepHaptic();
-      }
-      
-      // Hide flash and return to idle after animation
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          setState(() {
-            _showRepFlash = false;
-            _skeletonState = SkeletonState.idle;
-            _chargeProgress = 0.0;
-            _powerGaugeFill = 0.0;
-          });
-        }
+      // Hide flash after animation
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) setState(() => _showRepFlash = false);
       });
     };
     
@@ -301,12 +199,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     if (_currentExerciseIndex < _lockedWorkout!.exercises.length - 1) {
       setState(() {
         _currentExerciseIndex++;
-        
-        // Reset gaming state for new exercise
-        _skeletonState = SkeletonState.idle;
-        _chargeProgress = 0.0;
-        _powerGaugeFill = 0.0;
-      });
       });
       _startRest(); // Rest between exercises
     } else {
@@ -369,37 +261,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _landmarks = null;
       _currentExerciseIndex = 0;
     });
-  }
-
-  /// Get current exercise from locked workout
-  WorkoutExercise? _getCurrentExercise() {
-    if (_lockedWorkout == null || 
-        _currentExerciseIndex >= _lockedWorkout!.exercises.length) {
-      return null;
-    }
-    return _lockedWorkout!.exercises[_currentExerciseIndex];
-  }
-
-  /// Calculate charge progress (0.0 to 1.0) based on current angle
-  /// 0.0 = fully extended (start), 1.0 = fully contracted (bottom/deepest)
-  double _calculateChargeProgress(double currentAngle, ExerciseRule rule) {
-    final extendedAngle = rule.extendedAngle;
-    final contractedAngle = rule.contractedAngle;
-    
-    // Clamp angle to valid range
-    final clampedAngle = currentAngle.clamp(
-      contractedAngle.min(extendedAngle),
-      contractedAngle.max(extendedAngle),
-    );
-    
-    // Calculate progress
-    // If extended > contracted (e.g., squat: 170° → 90°)
-    if (extendedAngle > contractedAngle) {
-      return 1.0 - ((clampedAngle - contractedAngle) / (extendedAngle - contractedAngle));
-    } else {
-      // If extended < contracted (e.g., bicep curl: 45° → 160°)
-      return (clampedAngle - extendedAngle) / (contractedAngle - extendedAngle);
-    }
   }
 
   @override
@@ -546,10 +407,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       );
     }
 
-    return SlideTransition(
-      position: _shakeAnimation,
-      child: Stack(
-        children: [
+    return Stack(
+      children: [
         // Camera preview
         Positioned.fill(child: CameraPreview(_cameraController!)),
 
@@ -564,18 +423,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                   _cameraController!.value.previewSize!.width,
                 ),
                 isFrontCamera: true,
-                skeletonState: _skeletonState,
-                chargeProgress: _chargeProgress,
               ),
             ),
           ),
-
-        // GAMING: Power Gauge - Left edge
-        Positioned(
-          left: 16,
-          top: MediaQuery.of(context).size.height / 2 - 100, // Vertically centered
-          child: PowerGauge(fillPercent: _powerGaugeFill),
-        ),
 
         // Exercise info - top left
         Positioned(
@@ -844,7 +694,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ],
         ),
       ),
-    ),
     );
   }
 }
