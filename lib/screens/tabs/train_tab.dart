@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +11,8 @@ import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
 import '../../widgets/combo_counter.dart';
 import '../../widgets/shatter_animation.dart';
+import '../../widgets/tactical_countdown.dart';
+import '../../widgets/tactical_hud.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
@@ -65,25 +66,15 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   RepQuality? _lastRepQuality;
   bool _showShatterAnimation = false;
   
-  // Screen shake animation
-  late AnimationController _shakeController;
-  late Animation<Offset> _shakeAnimation;
-  final math.Random _random = math.Random();
+  // Countdown & body detection
+  bool _showCountdown = false;
+  bool _bodyDetected = false;
+  bool _countdownComplete = false;
 
   @override
   void initState() {
     super.initState();
     _loadLockedWorkout();
-    
-    // Initialize screen shake controller
-    _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 100),
-      vsync: this,
-    );
-    _shakeAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset.zero,
-    ).animate(_shakeController);
   }
 
   @override
@@ -92,7 +83,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _cameraController?.dispose();
     _poseDetectorService?.dispose();
     _session?.dispose();
-    _shakeController.dispose();
     super.dispose();
   }
 
@@ -101,25 +91,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     setState(() {
       _lockedWorkout = lockedWorkout;
     });
-  }
-
-  /// Trigger screen shake effect (for perfect reps)
-  void _triggerScreenShake() {
-    // Generate random offset for shake (3-5px)
-    final dx = (_random.nextDouble() * 10 - 5) / MediaQuery.of(context).size.width;
-    final dy = (_random.nextDouble() * 10 - 5) / MediaQuery.of(context).size.height;
-    
-    _shakeAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset(dx, dy),
-    ).animate(CurvedAnimation(
-      parent: _shakeController,
-      curve: Curves.elasticOut,
-    ));
-    
-    _shakeController
-      ..reset()
-      ..forward();
   }
 
   Future<void> _initializeCamera() async {
@@ -161,12 +132,20 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   }
 
   Future<void> _processFrame(CameraImage image) async {
-    if (_poseDetectorService == null || !_isWorkoutActive || _isResting) return;
+    if (_poseDetectorService == null) return;
 
     final landmarks = await _poseDetectorService!.detectPose(image);
 
     if (landmarks != null && mounted) {
-      _session?.processPose(landmarks);
+      // Body detected!
+      if (!_bodyDetected) {
+        setState(() => _bodyDetected = true);
+      }
+      
+      // Only process workout if countdown complete
+      if (_countdownComplete && _isWorkoutActive && !_isResting) {
+        _session?.processPose(landmarks);
+      }
 
       setState(() {
         _landmarks = landmarks;
@@ -194,14 +173,26 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           _powerGaugeFill = 0.0;
         }
       });
+    } else {
+      // Body lost
+      if (_bodyDetected && mounted) {
+        setState(() => _bodyDetected = false);
+      }
     }
   }
 
   Future<void> _startWorkout() async {
     if (_lockedWorkout == null || _lockedWorkout!.exercises.isEmpty) return;
 
-    // Initialize camera
+    // Initialize camera first
     await _initializeCamera();
+    
+    // Show countdown overlay
+    setState(() {
+      _showCountdown = true;
+      _bodyDetected = false;
+      _countdownComplete = false;
+    });
     
     // Initialize workout session
     _session = WorkoutSession();
@@ -217,11 +208,10 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         _skeletonState = SkeletonState.perfect;
       });
       
-      // Trigger haptic and shake based on form score
+      // Trigger haptic based on form score (removed shake)
       if (score >= 85) {
         // PERFECT REP
         HapticHelper.perfectRepHaptic();
-        _triggerScreenShake();
       } else if (score >= 60) {
         // GOOD REP
         HapticHelper.goodRepHaptic();
@@ -351,7 +341,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     if ((_session?.currentSet ?? 0) < (_session?.targetSets ?? 0)) {
       _session?.startNextSet();
     } else {
-      _startCurrentExercise();
+      // All sets complete - move to next exercise
+      _nextExercise();
     }
   }
 
@@ -573,6 +564,92 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
               onComplete: () {
                 if (mounted) setState(() => _showShatterAnimation = false);
               },
+            ),
+          ),
+        
+        // TACTICAL: Countdown & Body Detection HUD
+        if (_showCountdown)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.7),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // HUD showing body detection status
+                  TacticalHUD(
+                    status: _bodyDetected ? 'BODY DETECTED' : 'ENTER FRAME',
+                    subStatus: _bodyDetected 
+                        ? 'Hold position...' 
+                        : 'Step into view',
+                    statusColor: _bodyDetected 
+                        ? AppColors.cyberLime 
+                        : AppColors.electricCyan,
+                    showPulse: _bodyDetected,
+                  ),
+                  
+                  const SizedBox(height: 48),
+                  
+                  // Device placement guide
+                  if (!_bodyDetected)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      margin: const EdgeInsets.symmetric(horizontal: 32),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.electricCyan.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.phone_android,
+                            size: 48,
+                            color: AppColors.electricCyan,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'DEVICE PLACEMENT',
+                            style: TextStyle(
+                              color: AppColors.electricCyan,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Place device 6-8 feet away\nat waist height\nFull body should be visible',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.white70,
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  const SizedBox(height: 48),
+                  
+                  // Countdown starts when body detected
+                  if (_bodyDetected)
+                    TacticalCountdown(
+                      bodyDetected: _bodyDetected,
+                      onComplete: () {
+                        setState(() {
+                          _showCountdown = false;
+                          _countdownComplete = true;
+                          _isWorkoutActive = true;
+                        });
+                        _startCurrentExercise();
+                      },
+                    ),
+                ],
+              ),
             ),
           ),
 
