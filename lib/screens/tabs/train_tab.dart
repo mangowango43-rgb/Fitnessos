@@ -166,13 +166,10 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     final landmarks = await _poseDetectorService!.detectPose(image);
 
     if (landmarks != null && mounted) {
-      setState(() => _landmarks = landmarks);
-
-      // NEW: Process pose through workout session
       _session?.processPose(landmarks);
 
-      // Update UI with session state
       setState(() {
+        _landmarks = landmarks;
         _feedback = _session?.feedback ?? '';
         _formScore = _session?.formScore ?? 0;
 

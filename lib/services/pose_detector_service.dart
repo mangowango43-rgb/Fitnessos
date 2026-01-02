@@ -3,21 +3,12 @@ import 'package:camera/camera.dart';
 import 'dart:typed_data';
 import 'dart:ui' show Size;
 import 'dart:io' show Platform;
-import 'dart:math' as math;
 
 /// Service for detecting human poses using Google ML Kit
-/// ENHANCED with EMA smoothing and velocity gating for SKELATAL-grade precision
+/// Returns RAW ML Kit data for maximum responsiveness
 class PoseDetectorService {
   late PoseDetector _poseDetector;
   bool _isProcessing = false;
-
-  // EMA SMOOTHING LAYER (alpha = 0.3 for tactical responsiveness)
-  final Map<PoseLandmarkType, _SmoothedLandmark> _smoothedLandmarks = {};
-  static const double _emaAlpha = 0.3;
-
-  // VELOCITY GATE (reject noise > 1m/frame @ 30fps)
-  static const double _maxVelocityMetersPerFrame = 1.0;
-  DateTime? _lastFrameTime;
 
   PoseDetectorService() {
     // Initialize with stream mode for real-time video
@@ -42,7 +33,6 @@ class PoseDetectorService {
       final inputImage = _convertCameraImage(image);
       if (inputImage == null) {
         _isProcessing = false;
-        print('❌ Failed to convert camera image');
         return null;
       }
 
@@ -53,20 +43,12 @@ class PoseDetectorService {
 
       // Return landmarks from first detected pose
       if (poses.isNotEmpty) {
-        final rawLandmarks = poses.first.landmarks.values.toList();
-
-        // APPLY SMOOTHING AND VELOCITY GATING
-        final smoothedLandmarks = _applySmoothingAndGating(rawLandmarks);
-
-        if (smoothedLandmarks != null) {
-          return smoothedLandmarks;
-        }
+        return poses.first.landmarks.values.toList();
       }
 
       return null;
     } catch (e) {
       _isProcessing = false;
-      print('❌ Error detecting pose: $e');
       return null;
     }
   }
@@ -183,100 +165,8 @@ class PoseDetectorService {
     }
   }
 
-  /// TACTICAL SMOOTHING LAYER: EMA + Velocity Gate
-  /// Returns null if velocity gate rejects as noise
-  List<PoseLandmark>? _applySmoothingAndGating(List<PoseLandmark> rawLandmarks) {
-    final now = DateTime.now();
-    final double deltaTime = _lastFrameTime != null
-        ? now.difference(_lastFrameTime!).inMicroseconds / 1000000.0
-        : 0.033; // Assume 30fps if first frame
-
-    _lastFrameTime = now;
-
-    List<PoseLandmark> smoothedLandmarks = [];
-
-    for (final landmark in rawLandmarks) {
-      if (_smoothedLandmarks.containsKey(landmark.type)) {
-        // VELOCITY GATE: Check if movement is physically possible
-        final smoothed = _smoothedLandmarks[landmark.type]!;
-        final distance = math.sqrt(
-          math.pow(landmark.x - smoothed.x, 2) +
-          math.pow(landmark.y - smoothed.y, 2) +
-          math.pow(landmark.z - smoothed.z, 2),
-        );
-
-        final velocity = distance / deltaTime;
-
-        // REJECT if velocity exceeds 1m/frame (noise spike detected)
-        if (velocity > _maxVelocityMetersPerFrame) {
-          // Keep previous smoothed value, reject noisy input
-          smoothedLandmarks.add(smoothed.toLandmark(landmark.type));
-          continue;
-        }
-
-        // APPLY EMA SMOOTHING
-        smoothed.update(
-          landmark.x,
-          landmark.y,
-          landmark.z,
-          landmark.likelihood,
-          _emaAlpha,
-        );
-
-        smoothedLandmarks.add(smoothed.toLandmark(landmark.type));
-      } else {
-        // FIRST FRAME: Initialize smoothed landmark
-        _smoothedLandmarks[landmark.type] = _SmoothedLandmark(
-          x: landmark.x,
-          y: landmark.y,
-          z: landmark.z,
-          likelihood: landmark.likelihood,
-        );
-        smoothedLandmarks.add(landmark);
-      }
-    }
-
-    return smoothedLandmarks.isEmpty ? null : smoothedLandmarks;
-  }
-
   /// Clean up resources
   void dispose() {
     _poseDetector.close();
-    _smoothedLandmarks.clear();
-  }
-}
-
-/// EMA-smoothed pose landmark data
-class _SmoothedLandmark {
-  double x;
-  double y;
-  double z;
-  double likelihood;
-
-  _SmoothedLandmark({
-    required this.x,
-    required this.y,
-    required this.z,
-    required this.likelihood,
-  });
-
-  /// Update using Exponential Moving Average
-  void update(double newX, double newY, double newZ, double newLikelihood, double alpha) {
-    // EMA formula: smoothed = alpha * new + (1 - alpha) * old
-    x = alpha * newX + (1 - alpha) * x;
-    y = alpha * newY + (1 - alpha) * y;
-    z = alpha * newZ + (1 - alpha) * z;
-    likelihood = alpha * newLikelihood + (1 - alpha) * likelihood;
-  }
-
-  /// Convert to PoseLandmark for output
-  PoseLandmark toLandmark(PoseLandmarkType type) {
-    return PoseLandmark(
-      type: type,
-      x: x,
-      y: y,
-      z: z,
-      likelihood: likelihood,
-    );
   }
 }
