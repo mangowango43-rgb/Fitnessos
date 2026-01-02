@@ -103,6 +103,25 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     });
   }
 
+  /// Trigger screen shake effect (for perfect reps)
+  void _triggerScreenShake() {
+    // Generate random offset for shake (3-5px)
+    final dx = (_random.nextDouble() * 10 - 5) / MediaQuery.of(context).size.width;
+    final dy = (_random.nextDouble() * 10 - 5) / MediaQuery.of(context).size.height;
+    
+    _shakeAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset(dx, dy),
+    ).animate(CurvedAnimation(
+      parent: _shakeController,
+      curve: Curves.elasticOut,
+    ));
+    
+    _shakeController
+      ..reset()
+      ..forward();
+  }
+
   Future<void> _initializeCamera() async {
     try {
       final status = await Permission.camera.request();
@@ -175,11 +194,34 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       setState(() {
         _showRepFlash = true;
         _formScore = score;
+        
+        // GAMING: Flash skeleton to PERFECT state
+        _skeletonState = SkeletonState.perfect;
       });
       
-      // Hide flash after animation
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) setState(() => _showRepFlash = false);
+      // Trigger haptic and shake based on form score
+      if (score >= 85) {
+        // PERFECT REP
+        HapticHelper.perfectRepHaptic();
+        _triggerScreenShake();
+      } else if (score >= 60) {
+        // GOOD REP
+        HapticHelper.goodRepHaptic();
+      } else {
+        // MISSED REP
+        HapticHelper.missedRepHaptic();
+      }
+      
+      // Hide flash and return to idle after animation
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            _showRepFlash = false;
+            _skeletonState = SkeletonState.idle;
+            _chargeProgress = 0.0;
+            _powerGaugeFill = 0.0;
+          });
+        }
       });
     };
     
@@ -195,6 +237,35 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     
     _session!.onFeedback = (feedback) {
       setState(() => _feedback = feedback);
+    };
+
+    // GAMING: Combo callbacks
+    _session!.onComboChange = (combo, maxCombo) {
+      setState(() {
+        final oldCombo = _comboCount;
+        _comboCount = combo;
+        _maxCombo = maxCombo;
+        
+        // Check for combo break
+        if (oldCombo >= 3 && combo == 0) {
+          _showShatterAnimation = true;
+          HapticHelper.comboBreakHaptic();
+          
+          // Hide shatter after animation
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (mounted) setState(() => _showShatterAnimation = false);
+          });
+        }
+        
+        // Check for milestones (5X, 10X)
+        if (combo == 5 || combo == 10) {
+          HapticHelper.comboMilestoneHaptic();
+        }
+      });
+    };
+    
+    _session!.onRepQuality = (quality, score) {
+      setState(() => _lastRepQuality = quality);
     };
 
     setState(() {
@@ -454,7 +525,36 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                   _cameraController!.value.previewSize!.width,
                 ),
                 isFrontCamera: true,
+                skeletonState: _skeletonState,
+                chargeProgress: _chargeProgress,
               ),
+            ),
+          ),
+
+        // GAMING: Power Gauge - Left edge
+        Positioned(
+          left: 16,
+          top: MediaQuery.of(context).size.height / 2 - 100, // Vertically centered
+          child: PowerGauge(fillPercent: _powerGaugeFill),
+        ),
+
+        // GAMING: Combo Counter - Top left
+        Positioned(
+          top: 100,
+          left: 16,
+          child: ComboCounter(
+            comboCount: _comboCount,
+            maxCombo: _maxCombo,
+          ),
+        ),
+
+        // GAMING: Shatter Animation - Full screen overlay
+        if (_showShatterAnimation)
+          Positioned.fill(
+            child: ShatterAnimation(
+              onComplete: () {
+                if (mounted) setState(() => _showShatterAnimation = false);
+              },
             ),
           ),
 
