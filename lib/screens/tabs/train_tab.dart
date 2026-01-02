@@ -470,8 +470,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     
     print('🔄 END REST: Set $currentSet of $targetSets');
     
-    if (currentSet < targetSets) {
-      // More sets to go for THIS exercise
+    if (currentSet <= targetSets) {
+      // More sets to go for THIS exercise (or starting the last one)
       _session?.startNextSet();
     } else {
       // All sets complete for this exercise - MOVE TO NEXT
