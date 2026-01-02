@@ -911,6 +911,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             ),
           ],
         ),
+          ],
+        ),
       ),
-    )
-  };
+    );
+  }
+}
