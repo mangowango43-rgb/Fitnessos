@@ -181,16 +181,26 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         final repState = _session?.repState;
         final chargeProgress = _session?.chargeProgress ?? 0.0;
         
-        // Check for bad form feedback
+        // Check for bad form feedback - AGGRESSIVE detection
         final hasBadFormFeedback = _feedback.isNotEmpty && 
                                    (_feedback.contains('!') || 
                                     _feedback.contains('Keep') || 
                                     _feedback.contains('Don') ||
                                     _feedback.contains('deeper') ||
-                                    _feedback.contains('higher'));
+                                    _feedback.contains('higher') ||
+                                    _feedback.contains('Squeeze') ||
+                                    _feedback.contains('cave') ||
+                                    _feedback.contains('pike') ||
+                                    _feedback.contains('sag'));
+        
+        // DEBUG: Log form feedback and score
+        if (_feedback.isNotEmpty && _feedback != 'Get in frame') {
+          print('🔴 FORM CHECK: "$_feedback" | Score: $_formScore | HasBadFeedback: $hasBadFormFeedback');
+        }
 
-        if (hasBadFormFeedback && _formScore < 70) {
+        if (hasBadFormFeedback && _formScore < 80) {
           // BAD FORM DETECTED - Turn skeleton RED
+          print('🚨 SKELETON → RED (bad form detected)');
           _skeletonState = SkeletonState.error;
           _chargeProgress = chargeProgress;
           _powerGaugeFill = chargeProgress;

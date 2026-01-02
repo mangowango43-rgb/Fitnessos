@@ -368,8 +368,10 @@ class RepCounter {
   }
   
   /// ENHANCED: Check form issues with exercise-specific checks
+  /// NOW CHECKS FORM CONTINUOUSLY (removed early return on RepState.up)
   void _checkForm(List<PoseLandmark> landmarks) {
-    if (_state == RepState.up) return;
+    // REMOVED: if (_state == RepState.up) return;
+    // Form checking now happens ALWAYS to catch bad form immediately
     
     final landmarkMap = {for (var lm in landmarks) lm.type: lm};
     
