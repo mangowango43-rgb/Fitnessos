@@ -538,9 +538,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           child: PowerGauge(fillPercent: _powerGaugeFill),
         ),
 
-        // GAMING: Combo Counter - Top left
+        // GAMING: Combo Counter - Left side UNDER angle counter
         Positioned(
-          top: 100,
+          top: 180, // Below angle counter
           left: 16,
           child: ComboCounter(
             comboCount: _comboCount,
