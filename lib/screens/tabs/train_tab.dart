@@ -151,90 +151,54 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _countdownValue = 3;
     });
     
-    _voiceCoach?.speakNow('Get ready');
+    _voiceCoach?.speakNow('Get into position');
     
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_countdownValue > 1) {
-        setState(() => _countdownValue--);
-        _voiceCoach?.speakNow('$_countdownValue');
-      } else {
-        timer.cancel();
-        _startScanning();
-      }
-    });
-  }
-
-  void _startScanning() {
-    setState(() {
-      _phase = StartupPhase.scanning;
-      _scanProgress = 0;
-    });
-    
-    _scanAnimController.forward(from: 0);
-    
-    // Scan takes 1.5 seconds, then lock
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      _lockSystem();
-    });
-  }
-
-  void _lockSystem() {
-    // Get the exercise rule
-    final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
-    final rule = ExerciseRules.getRule(exercise.id);
-    
-    print('🎯 _lockSystem called');
-    print('   Exercise: ${exercise.name} (id: ${exercise.id})');
-    print('   Rule found: ${rule != null}');
-    print('   Landmarks: ${_landmarks?.length ?? 0}');
-    
-    if (rule == null) {
-      // No rule for this exercise - skip tracking, just go
-      print('⚠️ No rule found, starting without tracking');
-      _voiceCoach?.speakNow('Starting ${exercise.name}');
-      setState(() => _phase = StartupPhase.locked);
-      Future.delayed(const Duration(milliseconds: 800), () {
-        _beginExercise();
-      });
-      return;
-    }
-    
-    // Create rep counter
-    _repCounter = RepCounter(rule);
-    
-    // Try to capture baseline if we have landmarks
-    if (_landmarks != null && _landmarks!.isNotEmpty) {
-      _repCounter!.captureBaseline(_landmarks!);
-    }
-    
-    // Check if locked successfully
-    if (_repCounter!.isLocked) {
-      print('✅ LOCKED SUCCESSFULLY');
-      setState(() {
-        _phase = StartupPhase.locked;
-        _skeletonColor = AppColors.electricCyan;
-      });
-      
-      _voiceCoach?.speakNow('System locked');
-      
-      // Brief pause then start
-      Future.delayed(const Duration(milliseconds: 800), () {
-        _beginExercise();
-      });
-    } else {
-      // Not locked yet - keep scanning, try again in 500ms
-      // Don't restart the whole countdown, just keep trying
-      print('⏳ Not locked yet, retrying in 500ms');
-      setState(() {
-        _phase = StartupPhase.scanning;
-      });
-      
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (_phase == StartupPhase.scanning && mounted) {
-          _lockSystem(); // Try again
+    // Wait 1 second then start countdown
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_countdownValue > 1) {
+          setState(() => _countdownValue--);
+          _voiceCoach?.speakNow('$_countdownValue');
+        } else {
+          timer.cancel();
+          _voiceCoach?.speakNow('1');
+          _lockAndGo();
         }
       });
-    }
+    });
+  }
+
+  void _lockAndGo() {
+    // Quick scan visual
+    setState(() => _phase = StartupPhase.scanning);
+    _scanAnimController.forward(from: 0);
+    
+    // After scan animation, just lock and start - no retrying
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      
+      final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
+      final rule = ExerciseRules.getRule(exercise.id);
+      
+      // Create rep counter if we have a rule
+      if (rule != null) {
+        _repCounter = RepCounter(rule);
+        
+        // Try to capture baseline if we have landmarks
+        if (_landmarks != null && _landmarks!.isNotEmpty) {
+          _repCounter!.captureBaseline(_landmarks!);
+        }
+      }
+      
+      // Show locked state briefly
+      setState(() => _phase = StartupPhase.locked);
+      _voiceCoach?.speakNow('Locked');
+      
+      // Start exercise after brief pause
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) _beginExercise();
+      });
+    });
   }
 
   void _beginExercise() {
@@ -247,7 +211,13 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _totalSets = exercise.sets;
       _targetReps = exercise.reps;
       _comboCount = 0;
+      _skeletonColor = AppColors.electricCyan;
     });
+    
+    // If baseline wasn't captured during lock, try again now
+    if (_repCounter != null && !_repCounter!.isLocked && _landmarks != null) {
+      _repCounter!.captureBaseline(_landmarks!);
+    }
     
     _voiceCoach?.speakNow('${exercise.name}. ${exercise.sets} sets of ${exercise.reps}. Go!');
   }
