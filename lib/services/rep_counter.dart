@@ -60,17 +60,24 @@ class RepCounter {
   
   /// Call this when "SYSTEM LOCKED" - captures the baseline
   void captureBaseline(List<PoseLandmark> landmarks) {
+    print('🎯 Attempting baseline capture with ${landmarks.length} landmarks');
+    
     final points = _extractPoints(landmarks);
     if (points == null) {
       _feedback = "Can't see full body";
+      print('❌ Could not extract required points');
+      print('   Rule needs: ${rule.targetA}, ${rule.targetB}, ${rule.rulerA}, ${rule.rulerB}');
       return;
     }
     
     _baselineTarget = _distance(points.targetA, points.targetB);
     _baselineRuler = _distance(points.rulerA, points.rulerB);
     
+    print('📏 Distances: target=${_baselineTarget.toStringAsFixed(3)}, ruler=${_baselineRuler.toStringAsFixed(3)}');
+    
     if (_baselineRuler < 0.01) {
       _feedback = "Move back a bit";
+      print('❌ Ruler too small');
       return;
     }
     
@@ -163,12 +170,23 @@ class RepCounter {
     final rulerB = map[rule.rulerB];
     
     if (targetA == null || targetB == null || rulerA == null || rulerB == null) {
+      print('❌ Missing landmarks:');
+      if (targetA == null) print('   - targetA (${rule.targetA})');
+      if (targetB == null) print('   - targetB (${rule.targetB})');
+      if (rulerA == null) print('   - rulerA (${rule.rulerA})');
+      if (rulerB == null) print('   - rulerB (${rule.rulerB})');
       return null;
     }
     
-    // Check confidence - all points must be visible enough
-    if (targetA.likelihood < 0.5 || targetB.likelihood < 0.5 ||
-        rulerA.likelihood < 0.5 || rulerB.likelihood < 0.5) {
+    // Check confidence - lowered to 0.3 for more forgiving detection
+    const minConfidence = 0.3;
+    if (targetA.likelihood < minConfidence || targetB.likelihood < minConfidence ||
+        rulerA.likelihood < minConfidence || rulerB.likelihood < minConfidence) {
+      print('❌ Low confidence:');
+      print('   targetA: ${targetA.likelihood.toStringAsFixed(2)}');
+      print('   targetB: ${targetB.likelihood.toStringAsFixed(2)}');
+      print('   rulerA: ${rulerA.likelihood.toStringAsFixed(2)}');
+      print('   rulerB: ${rulerB.likelihood.toStringAsFixed(2)}');
       return null;
     }
     
