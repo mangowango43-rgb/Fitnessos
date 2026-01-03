@@ -60,8 +60,14 @@ class WorkoutSession {
   List<RepData> get repHistory => List.unmodifiable(_repHistory);
 
   // GAMING: Real-time charge progress for power gauge and skeleton state
-  // Inverted: bar FILLS as you go DOWN (percentage decreases)
-  double get chargeProgress => 1.0 - ((_counter?.currentPercentage ?? 100) / 100.0);
+  // percentage goes 100 -> 70 as you squat down
+  // chargeProgress should go 0 -> 1 as you squat down
+  // So: (100 - percentage) / 30 gives us 0->1 range for 100->70
+  double get chargeProgress {
+    final pct = _counter?.currentPercentage ?? 100;
+    // Map 100->70 to 0->1 (clamped)
+    return ((100 - pct) / 30).clamp(0.0, 1.0);
+  }
   RepState? get repState => _counter?.state;
   
   /// Initialize the session
