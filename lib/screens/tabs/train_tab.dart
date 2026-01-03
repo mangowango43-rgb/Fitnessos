@@ -21,6 +21,7 @@ import '../../providers/workout_provider.dart';
 // NEW: Import the rep counting system
 import '../../services/workout_session.dart';
 import '../../services/exercise_rules.dart';
+import '../../services/rep_counter.dart' show RepState;
 
 class TrainTab extends ConsumerStatefulWidget {
   const TrainTab({super.key});

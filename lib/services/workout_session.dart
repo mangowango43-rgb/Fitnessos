@@ -4,8 +4,8 @@ import 'rep_counter.dart';
 import 'voice_coach.dart';
 import '../models/rep_quality.dart';
 
-// Export RepState for UI access
-export 'rep_counter.dart' show RepState;
+// Export RepState and RepCounter for UI access
+export 'rep_counter.dart' show RepState, RepCounter;
 
 /// Manages the active workout session
 /// Connects: Pose Detection → Rep Counter → Voice Coach
