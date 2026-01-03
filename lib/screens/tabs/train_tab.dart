@@ -328,8 +328,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _currentExerciseIndex = 0;
     });
 
-    // Start first exercise
-    _startCurrentExercise();
+    // Exercise will start after countdown completes in _finishLockAndStartWorkout
   }
 
 
