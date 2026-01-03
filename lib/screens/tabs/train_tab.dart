@@ -251,12 +251,16 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     // Step 3: Show countdown screen (waiting for body detection)
     setState(() {
       _showCountdown = true;
-      _bodyDetected = false;
       _countdownComplete = false;
       _isScanning = false;
       _isLocked = false;
       _countdownValue = 3;
     });
+    
+    // If body already detected, start countdown immediately
+    if (_bodyDetected) {
+      _startCountdownTimer();
+    }
     
     // Initialize workout session
     _session = WorkoutSession();
