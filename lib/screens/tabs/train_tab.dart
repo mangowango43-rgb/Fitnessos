@@ -10,14 +10,18 @@ import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
 import '../../widgets/shatter_animation.dart';
+import '../../widgets/tactical_countdown.dart';
+import '../../widgets/tactical_hud.dart';
 import '../../widgets/phone_position_guide.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
+import '../../models/rep_quality.dart';
 import '../../providers/workout_provider.dart';
 
-// Import the rep counting system
-import '../../services/rep_counter.dart';
+// NEW: Import the rep counting system
+import '../../services/workout_session.dart';
+import '../../services/exercise_rules.dart';
 
 class TrainTab extends ConsumerStatefulWidget {
   const TrainTab({super.key});
@@ -38,20 +42,14 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   String? _cameraError;
   List<PoseLandmark>? _landmarks;
   
-  // Rep counter (new proportion-based system)
-  RepCounter? _repCounter;
+  // NEW: Workout session for rep counting
+  WorkoutSession? _session;
   
   // UI state
   bool _isWorkoutActive = false;
   bool _isResting = false;
   int _restTimeRemaining = 60;
   Timer? _restTimer;
-  
-  // Current set/rep tracking
-  int _currentSet = 1;
-  int _currentReps = 0;
-  int _targetSets = 3;
-  int _targetReps = 10;
   
   // Feedback display
   String _feedback = '';
@@ -63,11 +61,14 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   SkeletonState _skeletonState = SkeletonState.idle;
   double _chargeProgress = 0.0;
   double _powerGaugeFill = 0.0;
+  RepQuality? _lastRepQuality;
+  bool _showShatterAnimation = false;
   
   // Countdown & body detection
-  bool _showPhoneGuide = false;
   bool _showCountdown = false;
   bool _bodyDetected = false;
+  bool _countdownComplete = false;
+  bool _showPhoneGuide = false;
   bool _isScanning = false;
   bool _isLocked = false;
   int _countdownValue = 3;
@@ -85,6 +86,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _countdownTimer?.cancel();
     _cameraController?.dispose();
     _poseDetectorService?.dispose();
+    _session?.dispose();
     super.dispose();
   }
 
@@ -139,11 +141,11 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     final landmarks = await _poseDetectorService!.detectPose(image);
 
     if (landmarks != null && mounted) {
-      // Check if body is in frame
-      final hasLeftShoulder = landmarks.any((l) => l.type == PoseLandmarkType.leftShoulder && l.likelihood > 0.5);
-      final hasRightShoulder = landmarks.any((l) => l.type == PoseLandmarkType.rightShoulder && l.likelihood > 0.5);
-      final hasLeftHip = landmarks.any((l) => l.type == PoseLandmarkType.leftHip && l.likelihood > 0.5);
-      final hasRightHip = landmarks.any((l) => l.type == PoseLandmarkType.rightHip && l.likelihood > 0.5);
+      // Check if body is in frame (for countdown detection)
+      final hasLeftShoulder = landmarks.any((l) => l.type == PoseLandmarkType.leftShoulder);
+      final hasRightShoulder = landmarks.any((l) => l.type == PoseLandmarkType.rightShoulder);
+      final hasLeftHip = landmarks.any((l) => l.type == PoseLandmarkType.leftHip);
+      final hasRightHip = landmarks.any((l) => l.type == PoseLandmarkType.rightHip);
       
       final wasBodyDetected = _bodyDetected;
       final bodyInFrame = hasLeftShoulder && hasRightShoulder && hasLeftHip && hasRightHip;
@@ -153,7 +155,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         setState(() => _bodyDetected = bodyInFrame);
       }
       
-      // Start countdown when body first detected
+      // Start countdown when body first detected during countdown phase (before scanning/locked)
       if (_showCountdown && bodyInFrame && !wasBodyDetected && !_isScanning && !_isLocked) {
         _startCountdownTimer();
       }
@@ -164,84 +166,65 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         setState(() => _countdownValue = 3);
       }
       
-      // Process reps only after locked
-      if (_isLocked && _isWorkoutActive && !_isResting && _repCounter != null) {
-        final repCompleted = _repCounter!.processFrame(landmarks);
-        
-        if (repCompleted) {
-          _onRepCompleted();
-        }
-        
-        // Update UI state from rep counter
-        setState(() {
-          _feedback = _repCounter!.feedback;
-          _currentReps = _repCounter!.repCount;
-          
-          // Update skeleton state based on rep phase
-          final percentage = _repCounter!.currentPercentage;
-          final state = _repCounter!.state;
-          
-          if (state == RepState.down) {
-            _skeletonState = SkeletonState.charging;
-            _chargeProgress = 1.0 - (percentage / 100.0);
-            _powerGaugeFill = _chargeProgress;
-          } else {
-            _skeletonState = SkeletonState.idle;
-            _chargeProgress = 0.0;
-            _powerGaugeFill = 0.0;
-          }
-        });
+      // Only process workout if countdown complete
+      if (_countdownComplete && _isWorkoutActive && !_isResting) {
+        _session?.processPose(landmarks);
       }
 
       setState(() {
         _landmarks = landmarks;
+        // _feedback removed - voice coach handles feedback now
+        _formScore = _session?.formScore ?? 0;
+
+        // GAMING: Update skeleton state and power gauge based on rep phase
+        final repState = _session?.repState;
+        final chargeProgress = _session?.chargeProgress ?? 0.0;
+        
+        // Check for bad form feedback - AGGRESSIVE detection
+        final hasBadFormFeedback = _feedback.isNotEmpty && 
+                                   (_feedback.contains('!') || 
+                                    _feedback.contains('Keep') || 
+                                    _feedback.contains('Don') ||
+                                    _feedback.contains('deeper') ||
+                                    _feedback.contains('higher') ||
+                                    _feedback.contains('Squeeze') ||
+                                    _feedback.contains('cave') ||
+                                    _feedback.contains('pike') ||
+                                    _feedback.contains('sag'));
+        
+        // DEBUG: Log form feedback and score
+        if (_feedback.isNotEmpty && _feedback != 'Get in frame') {
+          print('🔴 FORM CHECK: "$_feedback" | Score: $_formScore | HasBadFeedback: $hasBadFormFeedback');
+        }
+
+        if (hasBadFormFeedback && _formScore < 80) {
+          // BAD FORM DETECTED - Turn skeleton RED
+          print('🚨 SKELETON → RED (bad form detected)');
+          _skeletonState = SkeletonState.error;
+          _chargeProgress = chargeProgress;
+          _powerGaugeFill = chargeProgress;
+        } else if (repState == RepState.goingDown || repState == RepState.down) {
+          // User is descending - CHARGING state
+          _skeletonState = SkeletonState.charging;
+          _chargeProgress = chargeProgress;
+          _powerGaugeFill = chargeProgress;
+        } else if (repState == RepState.goingUp) {
+          // User is ascending - IDLE state (or keep charging visual briefly)
+          _skeletonState = SkeletonState.idle;
+          // Keep power gauge filled briefly during ascent
+          _powerGaugeFill = chargeProgress;
+        } else {
+          // At rest position
+          _skeletonState = SkeletonState.idle;
+          _chargeProgress = 0.0;
+          _powerGaugeFill = 0.0;
+        }
       });
     } else {
       // Body lost
       if (_bodyDetected && mounted) {
         setState(() => _bodyDetected = false);
       }
-    }
-  }
-
-  void _onRepCompleted() {
-    print('🎯 REP COMPLETED: ${_repCounter!.repCount}');
-    
-    setState(() {
-      _showRepFlash = true;
-      _skeletonState = SkeletonState.perfect;
-    });
-    
-    // Haptic feedback
-    HapticHelper.perfectRepHaptic();
-    
-    // Hide flash after animation
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        setState(() {
-          _showRepFlash = false;
-          _skeletonState = SkeletonState.idle;
-          _chargeProgress = 0.0;
-          _powerGaugeFill = 0.0;
-        });
-      }
-    });
-    
-    // Check if set complete
-    if (_currentReps >= _targetReps) {
-      _onSetComplete();
-    }
-  }
-
-  void _onSetComplete() {
-    print('✅ SET $_currentSet COMPLETE');
-    
-    if (_currentSet >= _targetSets) {
-      // Exercise complete, move to next
-      _nextExercise();
-    } else {
-      // More sets, start rest
-      _startRest();
     }
   }
 
@@ -262,20 +245,90 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   }
   
   Future<void> _continueToCountdown() async {
-    // Initialize camera
+    // Step 2: Initialize camera
     await _initializeCamera();
     
-    // Show countdown screen
+    // Step 3: Show countdown screen (waiting for body detection)
     setState(() {
       _showCountdown = true;
       _bodyDetected = false;
+      _countdownComplete = false;
       _isScanning = false;
       _isLocked = false;
       _countdownValue = 3;
+    });
+    
+    // Initialize workout session
+    _session = WorkoutSession();
+    await _session!.init();
+    
+    // Set up callbacks
+    _session!.onRepCounted = (reps, score) {
+      print('🎯 REP COMPLETED: Rep $reps with score $score');
+      
+      setState(() {
+        _showRepFlash = true;
+        _formScore = score;
+        
+        // GAMING: Flash skeleton to PERFECT state
+        _skeletonState = SkeletonState.perfect;
+      });
+      
+      // Trigger haptic based on form score
+      if (score >= 85) {
+        // PERFECT REP
+        print('📳 Triggering PERFECT haptic');
+        HapticHelper.perfectRepHaptic();
+      } else if (score >= 60) {
+        // GOOD REP
+        print('📳 Triggering GOOD haptic');
+        HapticHelper.goodRepHaptic();
+      } else {
+        // MISSED REP
+        print('📳 Triggering MISSED haptic');
+        HapticHelper.missedRepHaptic();
+      }
+      
+      // Hide flash and return to idle after animation
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            _showRepFlash = false;
+            _skeletonState = SkeletonState.idle;
+            _chargeProgress = 0.0;
+            _powerGaugeFill = 0.0;
+          });
+        }
+      });
+    };
+    
+    _session!.onSetComplete = (setComplete, totalSets) {
+      if (setComplete >= totalSets) {
+        // Move to next exercise
+        _nextExercise();
+      } else {
+        // Start rest timer
+        _startRest();
+      }
+    };
+    
+    _session!.onFeedback = (feedback) {
+      setState(() => _feedback = feedback);
+    };
+
+    _session!.onRepQuality = (quality, score) {
+      setState(() => _lastRepQuality = quality);
+    };
+
+    setState(() {
       _isWorkoutActive = true;
       _currentExerciseIndex = 0;
     });
+
+    // Start first exercise
+    _startCurrentExercise();
   }
+
 
   void _startCountdownTimer() {
     _countdownTimer?.cancel();
@@ -304,7 +357,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     // Scanning for 2 seconds, then lock
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted && _bodyDetected) {
-        _lockOnUser();
+        _finishLockAndStartWorkout();
       } else if (mounted) {
         // Body lost during scanning, reset
         setState(() {
@@ -315,38 +368,66 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     });
   }
 
-  void _lockOnUser() {
-    if (_landmarks == null) return;
-    
-    // Initialize rep counter for current exercise
-    final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
-    final rule = ExerciseRules.getRule(exercise.id);
-    
-    if (rule != null) {
-      _repCounter = RepCounter(rule);
-      _repCounter!.captureBaseline(_landmarks!);
-      
-      setState(() {
-        _targetSets = exercise.sets;
-        _targetReps = exercise.reps;
-        _currentSet = 1;
-        _currentReps = 0;
-      });
-    }
-    
+  void _finishLockAndStartWorkout() {
     setState(() {
       _isScanning = false;
       _isLocked = true;
     });
     
-    // Show LOCKED for 1.5 seconds, then hide countdown overlay
+    // Show LOCKED for 1.5 seconds, then hide countdown and start workout
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
         setState(() {
           _showCountdown = false;
+          _countdownComplete = true;
         });
       }
     });
+  }
+
+  void _advanceToNextExercise() {
+    if (_lockedWorkout == null) return;
+    
+    if (_currentExerciseIndex < _lockedWorkout!.exercises.length - 1) {
+      // More exercises remaining
+      setState(() {
+        _currentExerciseIndex++;
+      });
+      print('▶️ Starting exercise ${_currentExerciseIndex + 1}: ${_lockedWorkout!.exercises[_currentExerciseIndex].name}');
+      _startCurrentExercise();
+    } else {
+      // ALL EXERCISES COMPLETE - Workout done!
+      print('🏆 WORKOUT COMPLETE!');
+      _completeWorkout();
+    }
+  }
+
+  void _completeWorkout() {
+    // Play completion haptic
+    HapticHelper.workoutCompleteHaptic();
+    
+    // End the workout
+    _endWorkout();
+    
+    // TODO: Show completion stats modal
+  }
+
+  void _startCurrentExercise() {
+    if (_lockedWorkout == null) return;
+    
+    final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
+    
+    // Check if we have a tracking rule for this exercise
+    if (ExerciseRules.hasRule(exercise.id)) {
+      _session?.startExercise(
+        exerciseId: exercise.id,
+        sets: exercise.sets,
+        reps: exercise.reps,
+      );
+    } else {
+      // No AI tracking for this exercise - just manual mode
+      print('⚠️ No tracking rule for ${exercise.name}, using manual mode');
+    }
   }
 
   void _nextExercise() {
@@ -356,17 +437,11 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       setState(() {
         _currentExerciseIndex++;
       });
-      _startRest();
+      _startRest(); // Rest between exercises
     } else {
       // Workout complete!
       _completeWorkout();
     }
-  }
-
-  void _completeWorkout() {
-    HapticHelper.workoutCompleteHaptic();
-    _endWorkout();
-    // TODO: Show completion stats modal
   }
 
   void _startRest() {
@@ -387,18 +462,21 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
 
   void _endRest() {
     _restTimer?.cancel();
-    setState(() {
-      _isResting = false;
-      _currentSet++;
-      _currentReps = 0;
-    });
+    setState(() => _isResting = false);
     
-    // Reset rep counter for next set
-    _repCounter?.reset();
+    // Check if we need to do more sets of current exercise
+    final currentSet = _session?.currentSet ?? 0;
+    final targetSets = _session?.targetSets ?? 0;
     
-    // Re-lock on user for new set/exercise
-    if (_landmarks != null && _repCounter != null) {
-      _repCounter!.captureBaseline(_landmarks!);
+    print('🔄 END REST: Set $currentSet of $targetSets');
+    
+    if (currentSet <= targetSets) {
+      // More sets to go for THIS exercise (or starting the last one)
+      _session?.startNextSet();
+    } else {
+      // All sets complete for this exercise - MOVE TO NEXT
+      print('✅ Exercise complete, moving to next');
+      _advanceToNextExercise();
     }
   }
 
@@ -408,18 +486,18 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   }
 
   void _finishSet() {
-    _onSetComplete();
+    _session?.skipToNextSet();
   }
 
   void _endWorkout() {
     _restTimer?.cancel();
-    _countdownTimer?.cancel();
     _cameraController?.stopImageStream();
     _cameraController?.dispose();
     _cameraController = null;
     _poseDetectorService?.dispose();
     _poseDetectorService = null;
-    _repCounter = null;
+    _session?.dispose();
+    _session = null;
 
     setState(() {
       _isWorkoutActive = false;
@@ -427,9 +505,6 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _isCameraInitialized = false;
       _landmarks = null;
       _currentExerciseIndex = 0;
-      _showCountdown = false;
-      _isScanning = false;
-      _isLocked = false;
     });
   }
 
@@ -451,6 +526,11 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       );
     }
     
+    // Step 2: Show countdown screen (waiting for body detection)
+    if (_showCountdown) {
+      return _buildCountdownScreen();
+    }
+    
     if (!_isWorkoutActive) {
       return _buildStartScreen();
     }
@@ -460,6 +540,168 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     }
 
     return _buildTrainingScreen();
+  }
+
+
+  Widget _buildCountdownScreen() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Camera preview
+          if (_cameraController != null && _isCameraInitialized)
+            Positioned.fill(
+              child: CameraPreview(_cameraController!),
+            ),
+          
+          // Skeleton overlay (shows body detection)
+          if (_landmarks != null && _cameraController != null)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: SkeletonPainter(
+                  landmarks: _landmarks,
+                  imageSize: Size(
+                    _cameraController!.value.previewSize!.height,
+                    _cameraController!.value.previewSize!.width,
+                  ),
+                  isFrontCamera: true,
+                  skeletonState: SkeletonState.idle,
+                  chargeProgress: 0.0,
+                ),
+              ),
+            ),
+          
+          // Dark overlay
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.6),
+            ),
+          ),
+          
+          // Countdown content - NEW FLOW: Get in position → 3,2,1 → Scanning → ✓ Locked
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Phase 1: GET IN POSITION (no body detected yet)
+                if (!_bodyDetected && !_isScanning && !_isLocked) ...[
+                  const Icon(
+                    Icons.accessibility_new,
+                    size: 100,
+                    color: AppColors.white30,
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'GET IN POSITION',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.electricCyan,
+                      letterSpacing: 4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Stay 5-7 feet from camera\nFull body visible',
+                    style: TextStyle(fontSize: 14, color: AppColors.white60),
+                    textAlign: TextAlign.center,
+                  ),
+                ]
+                // Phase 2: COUNTDOWN 3, 2, 1 (body detected, counting down)
+                else if (_bodyDetected && !_isScanning && !_isLocked) ...[
+                  Text(
+                    '$_countdownValue',
+                    style: TextStyle(
+                      fontSize: 150,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.electricCyan,
+                      shadows: [
+                        Shadow(
+                          color: AppColors.electricCyan.withOpacity(0.8),
+                          blurRadius: 40,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'HOLD POSITION',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.white70,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ]
+                // Phase 3: SCANNING (after 3,2,1 countdown)
+                else if (_isScanning) ...[
+                  SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 4,
+                      color: AppColors.electricCyan,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'SCANNING...',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.electricCyan,
+                      letterSpacing: 4,
+                    ),
+                  ),
+                ]
+                // Phase 4: LOCKED ✓ (scan complete, about to start)
+                else if (_isLocked) ...[
+                  Icon(
+                    Icons.check_circle,
+                    size: 100,
+                    color: AppColors.cyberLime,
+                  ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'LOCKED',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.cyberLime,
+                      letterSpacing: 4,
+                      shadows: [
+                        Shadow(
+                          color: AppColors.cyberLime.withOpacity(0.8),
+                          blurRadius: 30,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          
+          // Cancel button
+          Positioned(
+            top: 60,
+            left: 20,
+            child: IconButton(
+              onPressed: () {
+                _countdownTimer?.cancel();
+                setState(() {
+                  _showCountdown = false;
+                  _isWorkoutActive = false;
+                });
+                _endWorkout();
+              },
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStartScreen() {
@@ -574,6 +816,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     if (_lockedWorkout == null) return _buildStartScreen();
     
     final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
+    final size = MediaQuery.of(context).size;
 
     if (_cameraError != null) {
       return Center(child: Text(_cameraError!, style: const TextStyle(color: Colors.white)));
@@ -614,149 +857,134 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             ),
           ),
 
-        // COUNTDOWN OVERLAY
+        // GAMING: Power Gauge - Left edge
+        Positioned(
+          left: 16,
+          top: MediaQuery.of(context).size.height / 2 - 100, // Vertically centered
+          child: PowerGauge(fillPercent: _powerGaugeFill),
+        ),
+
+        // GAMING: Shatter Animation - Full screen overlay
+        if (_showShatterAnimation)
+          Positioned.fill(
+            child: ShatterAnimation(
+              onComplete: () {
+                if (mounted) setState(() => _showShatterAnimation = false);
+              },
+            ),
+          ),
+        
+        // TACTICAL: Countdown & Body Detection HUD
         if (_showCountdown)
           Positioned.fill(
             child: Container(
-              color: Colors.black.withOpacity(0.8),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Status based on phase
-                    if (!_bodyDetected) ...[
-                      // Waiting for body
-                      const Icon(
-                        Icons.accessibility_new,
-                        size: 100,
-                        color: AppColors.white30,
-                      ),
-                      const SizedBox(height: 32),
-                      const Text(
-                        'GET IN POSITION',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.electricCyan,
-                          letterSpacing: 4,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Stay 5-7 feet from camera\nFull body visible',
-                        style: TextStyle(fontSize: 14, color: AppColors.white60),
-                        textAlign: TextAlign.center,
-                      ),
-                    ] else if (!_isScanning && !_isLocked) ...[
-                      // Countdown 3, 2, 1
-                      Text(
-                        '$_countdownValue',
-                        style: TextStyle(
-                          fontSize: 150,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.electricCyan,
-                          shadows: [
-                            Shadow(
-                              color: AppColors.electricCyan.withOpacity(0.8),
-                              blurRadius: 40,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'HOLD POSITION',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.white70,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ] else if (_isScanning) ...[
-                      // Scanning
-                      SizedBox(
-                        width: 100,
-                        height: 100,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 4,
-                          color: AppColors.electricCyan,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      const Text(
-                        'SCANNING...',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.electricCyan,
-                          letterSpacing: 4,
-                        ),
-                      ),
-                    ] else if (_isLocked) ...[
-                      // Locked!
-                      const Icon(
-                        Icons.check_circle,
-                        size: 100,
-                        color: AppColors.cyberLime,
-                      ),
-                      const SizedBox(height: 32),
-                      Text(
-                        'LOCKED',
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.cyberLime,
-                          letterSpacing: 4,
-                          shadows: [
-                            Shadow(
-                              color: AppColors.cyberLime.withOpacity(0.8),
-                              blurRadius: 30,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-        // Power Gauge - Left edge (only show when not in countdown)
-        if (!_showCountdown)
-          Positioned(
-            left: 16,
-            top: MediaQuery.of(context).size.height / 2 - 100,
-            child: PowerGauge(fillPercent: _powerGaugeFill),
-          ),
-
-        // Exercise info - top left
-        if (!_showCountdown)
-          Positioned(
-            top: 50,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(12),
-              ),
+              color: Colors.black.withOpacity(0.7),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    exercise.name.toUpperCase(),
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                  // HUD showing body detection status
+                  TacticalHUD(
+                    status: _bodyDetected ? 'BODY DETECTED' : 'ENTER FRAME',
+                    subStatus: _bodyDetected 
+                        ? 'Hold position...' 
+                        : 'Step into view',
+                    statusColor: _bodyDetected 
+                        ? AppColors.cyberLime 
+                        : AppColors.electricCyan,
+                    showPulse: _bodyDetected,
                   ),
-                  Text(
-                    'SET $_currentSet/${exercise.sets}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.white60),
-                  ),
+                  
+                  const SizedBox(height: 48),
+                  
+                  // Device placement guide
+                  if (!_bodyDetected)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      margin: const EdgeInsets.symmetric(horizontal: 32),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.electricCyan.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.phone_android,
+                            size: 48,
+                            color: AppColors.electricCyan,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'DEVICE PLACEMENT',
+                            style: TextStyle(
+                              color: AppColors.electricCyan,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Place device 6-8 feet away\nat waist height\nFull body should be visible',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.white70,
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  const SizedBox(height: 48),
+                  
+                  // Countdown starts when body detected
+                  if (_bodyDetected)
+                    TacticalCountdown(
+                      bodyDetected: _bodyDetected,
+                      onComplete: () {
+                        setState(() {
+                          _showCountdown = false;
+                          _countdownComplete = true;
+                          _isWorkoutActive = true;
+                        });
+                        _startCurrentExercise();
+                      },
+                    ),
                 ],
               ),
             ),
           ),
+
+        // Exercise info - top left
+        Positioned(
+          top: 50,
+          left: 16,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exercise.name.toUpperCase(),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                ),
+                Text(
+                  'SET ${_session?.currentSet ?? 1}/${exercise.sets}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.white60),
+                ),
+              ],
+            ),
+          ),
+        ),
 
         // Close button
         Positioned(
@@ -775,51 +1003,50 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // REP COUNTER - Top Right
-        if (!_showCountdown)
-          Positioned(
-            top: 120,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppColors.cyberLime.withOpacity(0.5),
-                  width: 2,
+        // REP COUNTER - Top Right (compact)
+        Positioned(
+          top: 120,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.cyberLime.withOpacity(0.5),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cyberLime.withOpacity(0.3),
+                  blurRadius: 20,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.cyberLime.withOpacity(0.3),
-                    blurRadius: 20,
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${_session?.currentReps ?? 0}',
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.cyberLime,
+                    height: 1,
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '$_currentReps',
-                    style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.cyberLime,
-                      height: 1,
-                    ),
+                ),
+                Text(
+                  '/ ${exercise.reps}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.white50,
                   ),
-                  Text(
-                    '/ $_targetReps',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.white50,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
+        ),
 
         // Rep flash animation
         if (_showRepFlash)
@@ -846,78 +1073,94 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             ),
           ),
 
-        // Bottom buttons (only show when not in countdown)
-        if (!_showCountdown) ...[
-          // Record button - Bottom Left
-          Positioned(
-            bottom: 40,
-            left: 20,
+        // Text feedback REMOVED - voice coach handles all feedback now
+        // Screen shows: camera, skeleton, power gauge, rep counter only
+
+        // Debug info - current angle and phase
+        Positioned(
+          top: 120,
+          left: 16,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Angle: ${_session?.currentAngle.toStringAsFixed(0)}°',
+                  style: const TextStyle(fontSize: 10, color: AppColors.white60),
+                ),
+                Text(
+                  'Phase: ${_session?.phase ?? ""}',
+                  style: const TextStyle(fontSize: 10, color: AppColors.white60),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Record button - Bottom Left
+        Positioned(
+          bottom: 40,
+          left: 20,
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _isRecording = !_isRecording;
+              });
+              // TODO: Implement video recording
+              print('🎥 Recording: $_isRecording');
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _isRecording ? AppColors.neonCrimson : Colors.black.withOpacity(0.7),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _isRecording ? AppColors.neonCrimson : AppColors.white30,
+                  width: 2,
+                ),
+                boxShadow: _isRecording ? [
+                  BoxShadow(
+                    color: AppColors.neonCrimson.withOpacity(0.5),
+                    blurRadius: 20,
+                  ),
+                ] : null,
+              ),
+              child: Icon(
+                _isRecording ? Icons.stop : Icons.fiber_manual_record,
+                color: _isRecording ? Colors.white : AppColors.white70,
+                size: 24,
+              ),
+            ),
+          ),
+        ),
+
+        // Bottom center button
+        Positioned(
+          bottom: 40,
+          left: 0,
+          right: 0,
+          child: Center(
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isRecording = !_isRecording;
-                });
-                print('🎥 Recording: $_isRecording');
-              },
+              onTap: _finishSet,
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 decoration: BoxDecoration(
-                  color: _isRecording ? AppColors.neonCrimson : Colors.black.withOpacity(0.7),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _isRecording ? AppColors.neonCrimson : AppColors.white30,
-                    width: 2,
-                  ),
-                  boxShadow: _isRecording ? [
-                    BoxShadow(
-                      color: AppColors.neonCrimson.withOpacity(0.5),
-                      blurRadius: 20,
-                    ),
-                  ] : null,
+                  color: AppColors.cyberLime,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  _isRecording ? Icons.stop : Icons.fiber_manual_record,
-                  color: _isRecording ? Colors.white : AppColors.white70,
-                  size: 24,
+                child: const Text(
+                  'FINISH SET',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
                 ),
               ),
             ),
           ),
-
-          // Finish set button - Bottom center
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: _finishSet,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cyberLime,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Text(
-                    'FINISH SET',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-
-        // Cancel button during countdown
-        if (_showCountdown)
-          Positioned(
-            top: 60,
-            left: 20,
-            child: IconButton(
-              onPressed: _endWorkout,
-              icon: const Icon(Icons.close, color: Colors.white, size: 30),
-            ),
-          ),
+        ),
       ],
     );
   }
