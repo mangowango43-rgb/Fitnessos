@@ -6,7 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/app_colors.dart';
-import '../../utils/haptic_helper.dart';
+
 import '../../services/pose_detector_service.dart';
 import '../../widgets/skeleton_painter.dart';
 import '../../widgets/glassmorphism_card.dart';
@@ -179,44 +179,62 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   }
 
   void _lockSystem() {
-    // Capture baseline from current pose
-    if (_landmarks != null && _landmarks!.isNotEmpty) {
-      final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
-      final rule = ExerciseRules.getRule(exercise.id);
-      
-      if (rule != null) {
-        _repCounter = RepCounter(rule);
-        _repCounter!.captureBaseline(_landmarks!);
-        
-        if (_repCounter!.isLocked) {
-          setState(() {
-            _phase = StartupPhase.locked;
-            _skeletonColor = AppColors.electricCyan;
-          });
-          
-          _voiceCoach?.speakNow('System locked');
-          HapticHelper.setCompleteHaptic();
-          
-          // Brief pause then start
-          Future.delayed(const Duration(milliseconds: 800), () {
-            _beginExercise();
-          });
-          return;
-        }
-      }
+    // Get the exercise rule
+    final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
+    final rule = ExerciseRules.getRule(exercise.id);
+    
+    print('🎯 _lockSystem called');
+    print('   Exercise: ${exercise.name} (id: ${exercise.id})');
+    print('   Rule found: ${rule != null}');
+    print('   Landmarks: ${_landmarks?.length ?? 0}');
+    
+    if (rule == null) {
+      // No rule for this exercise - skip tracking, just go
+      print('⚠️ No rule found, starting without tracking');
+      _voiceCoach?.speakNow('Starting ${exercise.name}');
+      setState(() => _phase = StartupPhase.locked);
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _beginExercise();
+      });
+      return;
     }
     
-    // Failed to lock - tell user to get in frame
-    _voiceCoach?.speakNow('Step back. Get in frame.');
-    setState(() {
-      _phase = StartupPhase.countdown;
-      _countdownValue = 3;
-    });
+    // Create rep counter
+    _repCounter = RepCounter(rule);
     
-    // Retry countdown
-    Future.delayed(const Duration(seconds: 2), () {
-      _startCountdown();
-    });
+    // Try to capture baseline if we have landmarks
+    if (_landmarks != null && _landmarks!.isNotEmpty) {
+      _repCounter!.captureBaseline(_landmarks!);
+    }
+    
+    // Check if locked successfully
+    if (_repCounter!.isLocked) {
+      print('✅ LOCKED SUCCESSFULLY');
+      setState(() {
+        _phase = StartupPhase.locked;
+        _skeletonColor = AppColors.electricCyan;
+      });
+      
+      _voiceCoach?.speakNow('System locked');
+      
+      // Brief pause then start
+      Future.delayed(const Duration(milliseconds: 800), () {
+        _beginExercise();
+      });
+    } else {
+      // Not locked yet - keep scanning, try again in 500ms
+      // Don't restart the whole countdown, just keep trying
+      print('⏳ Not locked yet, retrying in 500ms');
+      setState(() {
+        _phase = StartupPhase.scanning;
+      });
+      
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_phase == StartupPhase.scanning && mounted) {
+          _lockSystem(); // Try again
+        }
+      });
+    }
   }
 
   void _beginExercise() {
@@ -327,7 +345,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     });
     
     // Haptic feedback
-    HapticHelper.goodRepHaptic();
+    // Visual feedback does the job - phone is on floor anyway
     
     // Voice announces rep number
     _voiceCoach?.announceRep(_currentReps);
@@ -358,7 +376,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     });
     
     _voiceCoach?.speakNow('Set ${_currentSet} complete. Rest.');
-    HapticHelper.setCompleteHaptic();
+
     
     _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() => _restTimeRemaining--);
@@ -405,7 +423,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       // Workout complete!
       setState(() => _phase = StartupPhase.complete);
       _voiceCoach?.speakNow('Workout complete. Great job!');
-      HapticHelper.workoutCompleteHaptic();
+
     }
   }
 
