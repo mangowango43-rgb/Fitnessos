@@ -1,258 +1,547 @@
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import '../utils/app_colors.dart';
+import 'dart:math' as math;
 
-/// Form quality levels for visual feedback
-enum FormQuality {
-  good,    // Green - form score >= 80
-  okay,    // Yellow - form score 50-79
-  bad,     // Red - form score < 50
-  neutral, // Cyan - no exercise active / between reps
-}
-
-/// Skeleton state for gaming-style visual feedback
-enum SkeletonState {
-  idle,      // White - waiting for next rep
-  charging,  // Cyan - user descending into rep, lines thickening
-  perfect,   // Lime flash - perfect rep completed
-  error,     // Red - bad form detected
-}
-
-/// CustomPainter that draws a glowing cyber-themed skeleton overlay
-/// Color changes based on form quality during exercise
-/// NOW WITH GAMING FEATURES: Dynamic line thickness, state-based colors, perfect flash
-class SkeletonPainter extends CustomPainter {
+/// CINEMATIC SKELETON PAINTER
+/// 
+/// Not a fitness UI. A film studio for your body.
+/// The user is the HERO. The skeleton makes them look like a superhero.
+/// 
+/// Three states:
+/// - IDLE: Dim, subtle, waiting
+/// - CHARGING: Building power, thickening, brightening
+/// - IMPACT: Explosive white flash, maximum intensity
+class CinematicSkeletonPainter extends CustomPainter {
   final List<PoseLandmark>? landmarks;
   final Size imageSize;
   final bool isFrontCamera;
-  final FormQuality formQuality;
-  final SkeletonState skeletonState;
-  final double chargeProgress; // 0.0 to 1.0 - how deep into rep (for power gauge sync)
-  final double? currentAngle; // Optional: display current angle for debugging
-
-  SkeletonPainter({
+  
+  /// 0.0 = idle, 0.0-1.0 = charging, 1.0+ = impact
+  final double intensity;
+  
+  /// True for the split second when rep counts
+  final bool isImpact;
+  
+  // Color palette
+  static const Color _dimCyan = Color(0x4D00F0FF);      // 30% opacity cyan
+  static const Color _electricBlue = Color(0xFF00F0FF); // Full cyan
+  static const Color _impactWhite = Color(0xFFFFFFFF);  // Pure white
+  static const Color _neonCore = Color(0xFFCCFF00);     // Lime accent
+  
+  CinematicSkeletonPainter({
     required this.landmarks,
     required this.imageSize,
     this.isFrontCamera = true,
-    this.formQuality = FormQuality.neutral,
-    this.skeletonState = SkeletonState.idle,
-    this.chargeProgress = 0.0,
-    this.currentAngle,
+    this.intensity = 0.0,
+    this.isImpact = false,
   });
-
-  /// Get skeleton color based on SKELETON STATE (for gaming feedback)
-  /// This overrides form quality when in special states
-  Color get _skeletonColor {
-    // State-based colors take priority
-    switch (skeletonState) {
-      case SkeletonState.idle:
-        return AppColors.white70; // White when idle
-      case SkeletonState.charging:
-        return AppColors.electricCyan; // Cyan when charging
-      case SkeletonState.perfect:
-        return AppColors.cyberLime; // LIME FLASH on perfect rep
-      case SkeletonState.error:
-        return AppColors.neonCrimson; // Red on error
-    }
-  }
-
-  /// Get joint color based on skeleton state
-  Color get _jointColor {
-    switch (skeletonState) {
-      case SkeletonState.idle:
-        return AppColors.cyberLime.withOpacity(0.7);
-      case SkeletonState.charging:
-        return AppColors.cyberLime;
-      case SkeletonState.perfect:
-        return AppColors.cyberLime; // LIME joints on perfect
-      case SkeletonState.error:
-        return AppColors.neonCrimson;
-    }
-  }
-
-  /// Get glow intensity based on skeleton state
-  /// Charging state increases glow with chargeProgress
-  double get _glowIntensity {
-    switch (skeletonState) {
-      case SkeletonState.idle:
-        return 6.0;
-      case SkeletonState.charging:
-        // Glow intensifies as user goes deeper: 6px → 12px
-        return 6.0 + (chargeProgress * 6.0);
-      case SkeletonState.perfect:
-        return 14.0; // MAXIMUM GLOW on perfect flash
-      case SkeletonState.error:
-        return 10.0;
-    }
-  }
-
-  /// Get line width - INCREASED for visibility (SOLID LINES)
-  double get _lineWidth {
-    switch (skeletonState) {
-      case SkeletonState.idle:
-        return 4.0; // Was 2.0 - NOW THICKER
-      case SkeletonState.charging:
-        // Lines thicken from 4px → 6px as user goes deeper
-        return 4.0 + (chargeProgress * 2.0);
-      case SkeletonState.perfect:
-        return 6.0; // Was 4.0 - THICKER for perfect flash
-      case SkeletonState.error:
-        return 5.0; // Was 3.0
-    }
-  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (landmarks == null || landmarks!.isEmpty) {
-      return;
+    if (landmarks == null || landmarks!.isEmpty) return;
+    
+    // Calculate visual properties based on state
+    final Color skeletonColor;
+    final double lineWidth;
+    final double glowRadius;
+    final double jointSize;
+    
+    if (isImpact) {
+      // IMPACT STATE - Explosive white flash
+      skeletonColor = _impactWhite;
+      lineWidth = 8.0;
+      glowRadius = 16.0;
+      jointSize = 12.0;
+    } else if (intensity > 0) {
+      // CHARGING STATE - Building power
+      // Lerp from dim to electric based on intensity
+      skeletonColor = Color.lerp(_dimCyan, _electricBlue, intensity)!;
+      lineWidth = 2.0 + (intensity * 4.0);  // 2px → 6px
+      glowRadius = 4.0 + (intensity * 8.0); // 4 → 12
+      jointSize = 5.0 + (intensity * 4.0);  // 5 → 9
+    } else {
+      // IDLE STATE - Dim and subtle
+      skeletonColor = _dimCyan;
+      lineWidth = 2.0;
+      glowRadius = 4.0;
+      jointSize = 5.0;
     }
-
-    // SOLID LINES - REMOVED blur for maximum visibility
+    
+    // Main line paint with glow
     final linePaint = Paint()
-      ..color = _skeletonColor
-      ..strokeWidth = _lineWidth // THICKER: 4-6px
+      ..color = skeletonColor
+      ..strokeWidth = lineWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowRadius);
+    
+    // Inner core line (brighter, thinner) for that neon tube look
+    final corePaint = Paint()
+      ..color = isImpact ? _impactWhite : _electricBlue.withOpacity(0.9)
+      ..strokeWidth = lineWidth * 0.4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
-      // REMOVED: ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
-
-    // SOLID joints - REMOVED blur
-    final largeJointPaint = Paint()
-      ..color = _jointColor
+    
+    // Joint outer glow
+    final jointGlowPaint = Paint()
+      ..color = skeletonColor.withOpacity(0.6)
+      ..style = PaintingStyle.fill
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowRadius + 4);
+    
+    // Joint core
+    final jointCorePaint = Paint()
+      ..color = isImpact ? _impactWhite : _electricBlue
       ..style = PaintingStyle.fill;
-      // REMOVED: ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity + 2);
-
-    // SOLID small joints - REMOVED blur
-    final smallJointPaint = Paint()
-      ..color = _skeletonColor
-      ..style = PaintingStyle.fill;
-      // REMOVED: ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowIntensity);
-
-    // Create a map for quick landmark lookup
-    final Map<PoseLandmarkType, PoseLandmark> landmarkMap = {};
-    for (final landmark in landmarks!) {
-      landmarkMap[landmark.type] = landmark;
-    }
-
-    // Helper function to get position with proper scaling and mirroring
-    Offset? getPosition(PoseLandmarkType type) {
-      final landmark = landmarkMap[type];
-      if (landmark == null) return null;
-
-      double x = landmark.x * size.width / imageSize.width;
-      double y = landmark.y * size.height / imageSize.height;
-
-      if (isFrontCamera) {
-        x = size.width - x;
-      }
-
+    
+    // Create landmark map
+    final map = {for (var lm in landmarks!) lm.type: lm};
+    
+    // Helper: Get screen position
+    Offset? getPos(PoseLandmarkType type) {
+      final lm = map[type];
+      if (lm == null || lm.likelihood < 0.5) return null;
+      
+      double x = isFrontCamera 
+          ? size.width - (lm.x / imageSize.width * size.width)
+          : lm.x / imageSize.width * size.width;
+      double y = lm.y / imageSize.height * size.height;
+      
       return Offset(x, y);
     }
-
-    // Helper to draw line between two landmarks
-    void drawLine(PoseLandmarkType type1, PoseLandmarkType type2) {
-      final pos1 = getPosition(type1);
-      final pos2 = getPosition(type2);
-      if (pos1 != null && pos2 != null) {
-        canvas.drawLine(pos1, pos2, linePaint);
+    
+    // Helper: Draw bone with glow + core
+    void drawBone(PoseLandmarkType from, PoseLandmarkType to) {
+      final start = getPos(from);
+      final end = getPos(to);
+      if (start == null || end == null) return;
+      
+      // Outer glow
+      canvas.drawLine(start, end, linePaint);
+      // Inner core (only when charging or impact)
+      if (intensity > 0.3 || isImpact) {
+        canvas.drawLine(start, end, corePaint);
       }
     }
-
-    // Helper to draw joint
-    void drawJoint(PoseLandmarkType type, {bool large = false}) {
-      final pos = getPosition(type);
-      if (pos != null) {
-        final radius = large ? 12.0 : 8.0;
-        final paint = large ? largeJointPaint : smallJointPaint;
-        canvas.drawCircle(pos, radius, paint);
-      }
+    
+    // Helper: Draw joint with glow
+    void drawJoint(PoseLandmarkType type, {double sizeMultiplier = 1.0}) {
+      final pos = getPos(type);
+      if (pos == null) return;
+      
+      final radius = jointSize * sizeMultiplier;
+      
+      // Outer glow
+      canvas.drawCircle(pos, radius * 1.5, jointGlowPaint);
+      // Core
+      canvas.drawCircle(pos, radius * 0.6, jointCorePaint);
     }
-
-    // === DRAW SKELETON ===
-
-    // Torso
-    drawLine(PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
-    drawLine(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip);
-    drawLine(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip);
-    drawLine(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
-
-    // Left arm
-    drawLine(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow);
-    drawLine(PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist);
-
-    // Right arm
-    drawLine(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow);
-    drawLine(PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist);
-
-    // Left leg
-    drawLine(PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
-    drawLine(PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle);
-
-    // Right leg
-    drawLine(PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
-    drawLine(PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
-
-    // === DRAW JOINTS ===
-
-    // Large joints
-    drawJoint(PoseLandmarkType.leftShoulder, large: true);
-    drawJoint(PoseLandmarkType.rightShoulder, large: true);
-    drawJoint(PoseLandmarkType.leftHip, large: true);
-    drawJoint(PoseLandmarkType.rightHip, large: true);
-
-    // Small joints
+    
+    // =========================================================================
+    // DRAW SKELETON - BODY ONLY
+    // =========================================================================
+    
+    // TORSO
+    drawBone(PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
+    drawBone(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip);
+    drawBone(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip);
+    drawBone(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
+    
+    // LEFT ARM
+    drawBone(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow);
+    drawBone(PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist);
+    
+    // RIGHT ARM
+    drawBone(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow);
+    drawBone(PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist);
+    
+    // LEFT LEG
+    drawBone(PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
+    drawBone(PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle);
+    
+    // RIGHT LEG
+    drawBone(PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
+    drawBone(PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
+    
+    // JOINTS - Major joints bigger
+    drawJoint(PoseLandmarkType.leftShoulder, sizeMultiplier: 1.3);
+    drawJoint(PoseLandmarkType.rightShoulder, sizeMultiplier: 1.3);
+    drawJoint(PoseLandmarkType.leftHip, sizeMultiplier: 1.3);
+    drawJoint(PoseLandmarkType.rightHip, sizeMultiplier: 1.3);
+    
+    // Arms
     drawJoint(PoseLandmarkType.leftElbow);
     drawJoint(PoseLandmarkType.rightElbow);
-    drawJoint(PoseLandmarkType.leftWrist);
-    drawJoint(PoseLandmarkType.rightWrist);
-    drawJoint(PoseLandmarkType.leftKnee);
-    drawJoint(PoseLandmarkType.rightKnee);
-    drawJoint(PoseLandmarkType.leftAnkle);
-    drawJoint(PoseLandmarkType.rightAnkle);
+    drawJoint(PoseLandmarkType.leftWrist, sizeMultiplier: 0.8);
+    drawJoint(PoseLandmarkType.rightWrist, sizeMultiplier: 0.8);
+    
+    // Legs
+    drawJoint(PoseLandmarkType.leftKnee, sizeMultiplier: 1.1);
+    drawJoint(PoseLandmarkType.rightKnee, sizeMultiplier: 1.1);
+    drawJoint(PoseLandmarkType.leftAnkle, sizeMultiplier: 0.8);
+    drawJoint(PoseLandmarkType.rightAnkle, sizeMultiplier: 0.8);
+  }
 
-    // Head
-    drawJoint(PoseLandmarkType.nose, large: true);
+  @override
+  bool shouldRepaint(CinematicSkeletonPainter oldDelegate) {
+    return oldDelegate.landmarks != landmarks ||
+           oldDelegate.intensity != intensity ||
+           oldDelegate.isImpact != isImpact;
+  }
+}
 
-    // === OPTIONAL: Debug angle display ===
-    if (currentAngle != null) {
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '${currentAngle!.toStringAsFixed(1)}°',
-          style: TextStyle(
-            color: _skeletonColor,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            shadows: [
-              Shadow(
-                color: _skeletonColor.withOpacity(0.8),
-                blurRadius: 10,
+
+// =============================================================================
+// SCREEN BORDER FLASH - Peripheral feedback you can see while exercising
+// =============================================================================
+
+class ScreenBorderFlash extends StatelessWidget {
+  final bool isActive;
+  final Color color;
+  final double width;
+  
+  const ScreenBorderFlash({
+    super.key,
+    this.isActive = false,
+    this.color = const Color(0xFF00F0FF),
+    this.width = 8.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isActive) return const SizedBox.shrink();
+    
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: color,
+              width: width,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.6),
+                blurRadius: 30,
+                spreadRadius: 10,
               ),
             ],
           ),
         ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(20, size.height - 60));
-    }
-  }
-
-  @override
-  bool shouldRepaint(SkeletonPainter oldDelegate) {
-    return oldDelegate.landmarks != landmarks ||
-        oldDelegate.formQuality != formQuality ||
-        oldDelegate.skeletonState != skeletonState ||
-        oldDelegate.chargeProgress != chargeProgress ||
-        oldDelegate.currentAngle != currentAngle;
+      ),
+    );
   }
 }
 
+
 // =============================================================================
-// HELPER: Convert form score (0-100) to FormQuality
+// CAMERA DIMMER - Makes the user POP against dark background
 // =============================================================================
 
-FormQuality getFormQuality(double? formScore) {
-  if (formScore == null) return FormQuality.neutral;
-  if (formScore >= 80) return FormQuality.good;
-  if (formScore >= 50) return FormQuality.okay;
-  return FormQuality.bad;
+class CameraDimmer extends StatelessWidget {
+  /// 0.0 = no dim, 1.0 = full black
+  final double dimLevel;
+  
+  const CameraDimmer({
+    super.key,
+    this.dimLevel = 0.3,  // 30% dim by default
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Container(
+          color: Colors.black.withOpacity(dimLevel),
+        ),
+      ),
+    );
+  }
+}
+
+
+// =============================================================================
+// IMPACT FLASH - Full screen white flash on rep count
+// =============================================================================
+
+class ImpactFlash extends StatefulWidget {
+  final bool trigger;
+  final VoidCallback? onComplete;
+  
+  const ImpactFlash({
+    super.key,
+    this.trigger = false,
+    this.onComplete,
+  });
+
+  @override
+  State<ImpactFlash> createState() => _ImpactFlashState();
+}
+
+class _ImpactFlashState extends State<ImpactFlash> 
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacity;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    
+    _opacity = Tween<double>(begin: 0.6, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onComplete?.call();
+      }
+    });
+  }
+  
+  @override
+  void didUpdateWidget(ImpactFlash oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.trigger && !oldWidget.trigger) {
+      _controller.forward(from: 0);
+    }
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacity,
+      builder: (context, child) {
+        if (_opacity.value <= 0) return const SizedBox.shrink();
+        
+        return Positioned.fill(
+          child: IgnorePointer(
+            child: Container(
+              color: Colors.white.withOpacity(_opacity.value),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+// =============================================================================
+// REP COUNTER HUD - Minimal, tactical, cinematic
+// =============================================================================
+
+class CinematicRepCounter extends StatelessWidget {
+  final int current;
+  final int target;
+  final bool flash;
+  
+  const CinematicRepCounter({
+    super.key,
+    required this.current,
+    required this.target,
+    this.flash = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: flash 
+              ? const Color(0xFFCCFF00)  // Lime on flash
+              : const Color(0xFF00F0FF).withOpacity(0.3),
+          width: flash ? 2 : 1,
+        ),
+        boxShadow: flash ? [
+          BoxShadow(
+            color: const Color(0xFFCCFF00).withOpacity(0.4),
+            blurRadius: 20,
+          ),
+        ] : null,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$current',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 56,
+              fontWeight: FontWeight.w900,
+              color: flash ? const Color(0xFFCCFF00) : Colors.white,
+              height: 1,
+              letterSpacing: -2,
+            ),
+          ),
+          Text(
+            '/ $target',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              color: Colors.white.withOpacity(0.5),
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+// =============================================================================
+// POWER BAR - Vertical gauge that fills as you descend
+// =============================================================================
+
+class PowerBar extends StatelessWidget {
+  /// 0.0 = empty (standing), 1.0 = full (at depth)
+  final double fillLevel;
+  
+  /// Target line position (0.0-1.0), typically 0.6 for "good rep"
+  final double targetLine;
+  
+  /// True when fill has passed the target
+  final bool targetHit;
+  
+  const PowerBar({
+    super.key,
+    required this.fillLevel,
+    this.targetLine = 0.6,
+    this.targetHit = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 12,
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: const Color(0xFF00F0FF).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Fill bar (from bottom)
+          Positioned(
+            left: 2,
+            right: 2,
+            bottom: 2,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 50),
+              height: (200 - 4) * fillLevel.clamp(0.0, 1.0),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: targetHit
+                      ? [
+                          const Color(0xFFCCFF00),  // Lime when target hit
+                          const Color(0xFFFFFFFF),  // White at top
+                        ]
+                      : [
+                          const Color(0xFF00F0FF).withOpacity(0.7),
+                          const Color(0xFF00F0FF),
+                        ],
+                ),
+                boxShadow: targetHit ? [
+                  BoxShadow(
+                    color: const Color(0xFFCCFF00).withOpacity(0.6),
+                    blurRadius: 10,
+                  ),
+                ] : null,
+              ),
+            ),
+          ),
+          
+          // Target line
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: (200 - 4) * targetLine,
+            child: Container(
+              height: 2,
+              color: targetHit 
+                  ? const Color(0xFFCCFF00)
+                  : Colors.white.withOpacity(0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+// =============================================================================
+// COMBO DISPLAY - Shows streak, only appears at 3+
+// =============================================================================
+
+class ComboDisplay extends StatelessWidget {
+  final int combo;
+  
+  const ComboDisplay({
+    super.key,
+    required this.combo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (combo < 3) return const SizedBox.shrink();
+    
+    // Color based on combo level
+    final Color comboColor;
+    final String emoji;
+    
+    if (combo >= 10) {
+      comboColor = const Color(0xFFFF003C);  // Red - ON FIRE
+      emoji = '⚡';
+    } else if (combo >= 5) {
+      comboColor = const Color(0xFFFF9500);  // Orange - HOT
+      emoji = '🔥';
+    } else {
+      comboColor = const Color(0xFFCCFF00);  // Lime - GOOD
+      emoji = '';
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: comboColor.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: comboColor.withOpacity(0.5),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Text(
+        '$emoji ${combo}x $emoji'.trim(),
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+          color: Colors.black,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
 }
