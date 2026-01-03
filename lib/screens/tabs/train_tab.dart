@@ -181,18 +181,18 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         final repState = _session?.repState;
         final chargeProgress = _session?.chargeProgress ?? 0.0;
 
-        if (repState == RepState.goingDown || repState == RepState.down) {
-          // User is descending - CHARGING state
+        if (repState == RepState.down) {
+          // User is descending/at bottom - CHARGING state
           _skeletonState = SkeletonState.charging;
           _chargeProgress = chargeProgress;
           _powerGaugeFill = chargeProgress;
-        } else if (repState == RepState.goingUp) {
+        } else if (repState == RepState.up) {
           // User is ascending - IDLE state (or keep charging visual briefly)
           _skeletonState = SkeletonState.idle;
           // Keep power gauge filled briefly during ascent
           _powerGaugeFill = chargeProgress;
         } else {
-          // At rest position
+          // At ready position
           _skeletonState = SkeletonState.idle;
           _chargeProgress = 0.0;
           _powerGaugeFill = 0.0;
