@@ -195,7 +195,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           });
           
           _voiceCoach?.speakNow('System locked');
-          HapticHelper.heavyImpact();
+          HapticHelper.setCompleteHaptic();
           
           // Brief pause then start
           Future.delayed(const Duration(milliseconds: 800), () {
@@ -327,7 +327,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     });
     
     // Haptic feedback
-    HapticHelper.mediumImpact();
+    HapticHelper.goodRepHaptic();
     
     // Voice announces rep number
     _voiceCoach?.announceRep(_currentReps);
@@ -358,7 +358,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     });
     
     _voiceCoach?.speakNow('Set ${_currentSet} complete. Rest.');
-    HapticHelper.heavyImpact();
+    HapticHelper.setCompleteHaptic();
     
     _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() => _restTimeRemaining--);
