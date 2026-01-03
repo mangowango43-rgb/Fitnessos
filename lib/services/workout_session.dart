@@ -1,11 +1,10 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'exercise_rules.dart';
 import 'rep_counter.dart';
 import 'voice_coach.dart';
 import '../models/rep_quality.dart';
 
 // Export RepState and RepCounter for UI access
-export 'rep_counter.dart' show RepState, RepCounter;
+export 'rep_counter.dart' show RepState, RepCounter, ExerciseRule, ExerciseRules;
 
 /// Manages the active workout session
 /// Connects: Pose Detection → Rep Counter → Voice Coach
@@ -13,7 +12,8 @@ class WorkoutSession {
   final VoiceCoach _voice = VoiceCoach();
   RepCounter? _counter;
   ExerciseRule? _currentExercise;
-  
+  bool _baselineCaptured = false;
+
   // Current state
   int _currentSetIndex = 0;
   int _targetReps = 0;
@@ -45,11 +45,11 @@ class WorkoutSession {
   int get currentSet => _currentSetIndex + 1;
   int get targetReps => _targetReps;
   int get targetSets => _targetSets;
-  double get currentAngle => _counter?.currentAngle ?? 0;
-  double get formScore => _counter?.formScore ?? 0;
+  double get currentAngle => _counter?.currentPercentage ?? 0;
+  double get formScore => _counter?.currentPercentage ?? 0;
   String get feedback => _counter?.feedback ?? '';
   String get exerciseName => _currentExercise?.name ?? '';
-  String get phase => _counter?.state ?? '';
+  String get phase => _counter?.state.name ?? '';
 
   // GAMING: Combo getters
   int get currentCombo => _currentCombo;
@@ -60,8 +60,8 @@ class WorkoutSession {
   List<RepData> get repHistory => List.unmodifiable(_repHistory);
 
   // GAMING: Real-time charge progress for power gauge and skeleton state
-  double get chargeProgress => _counter?.chargeProgress ?? 0.0;
-  RepState? get repState => _counter?.repState;
+  double get chargeProgress => (_counter?.currentPercentage ?? 0) / 100.0;
+  RepState? get repState => _counter?.state;
   
   /// Initialize the session
   Future<void> init() async {
@@ -74,20 +74,21 @@ class WorkoutSession {
     required int sets,
     required int reps,
   }) async {
-    final rule = ExerciseRules.getRule(exerciseId);
-    if (rule == null) {
+    if (!ExerciseRules.hasRule(exerciseId)) {
       print('⚠️ No tracking rule for: $exerciseId');
       return;
     }
-    
+
+    final rule = ExerciseRules.getRule(exerciseId);
     _currentExercise = rule;
     _counter = RepCounter(rule);
+    _baselineCaptured = false; // Reset baseline flag for new exercise
     _targetSets = sets;
     _targetReps = reps;
     _currentSetIndex = 0;
     _isActive = true;
     _isResting = false;
-    
+
     // GAMING: Reset combo tracking for new exercise
     _currentCombo = 0;
     _maxCombo = 0;
@@ -97,7 +98,7 @@ class WorkoutSession {
     _missedReps = 0;
     _repHistory = [];
     _setStartTime = DateTime.now();
-    
+
     await _voice.announceExercise(rule.name, sets, reps);
   }
   
@@ -105,13 +106,20 @@ class WorkoutSession {
   /// Call this every frame with the detected landmarks
   void processPose(List<PoseLandmark> landmarks) {
     if (!_isActive || _isResting || _counter == null) return;
-    
-    bool repCompleted = _counter!.processPose(landmarks);
-    
+
+    // Capture baseline on first frame to lock on to user
+    if (!_baselineCaptured) {
+      _counter!.captureBaseline(landmarks);
+      _baselineCaptured = true;
+      return; // Don't process first frame
+    }
+
+    bool repCompleted = _counter!.processFrame(landmarks);
+
     if (repCompleted) {
       _onRepCompleted();
     }
-    
+
     // Send feedback if changed
     if (_counter!.feedback.isNotEmpty) {
       onFeedback?.call(_counter!.feedback);
@@ -120,11 +128,11 @@ class WorkoutSession {
   
   void _onRepCompleted() {
     final reps = _counter!.repCount;
-    final score = _counter!.formScore;
-    
+    final score = _counter!.currentPercentage; // Use percentage as form score
+
     // GAMING: Classify rep quality
     final quality = classifyRep(score);
-    
+
     // GAMING: Update combo
     if (quality == RepQuality.perfect || quality == RepQuality.good) {
       _currentCombo++;
@@ -138,7 +146,7 @@ class WorkoutSession {
       }
       _currentCombo = 0;
     }
-    
+
     // GAMING: Track rep stats
     switch (quality) {
       case RepQuality.perfect:
@@ -151,25 +159,25 @@ class WorkoutSession {
         _missedReps++;
         break;
     }
-    
+
     // GAMING: Store rep data
     _repHistory.add(RepData(
       quality: quality,
       formScore: score,
-      angle: _counter!.currentAngle,
+      angle: _counter!.currentPercentage, // Store percentage instead of angle
       timestamp: DateTime.now(),
     ));
-    
+
     // GAMING: Fire callbacks
     onRepQuality?.call(quality, score);
     onComboChange?.call(_currentCombo, _maxCombo);
-    
+
     // Announce rep
     _voice.announceRep(reps);
-    
+
     // Callback
     onRepCounted?.call(reps, score);
-    
+
     // Check if set complete
     if (reps >= _targetReps) {
       _onSetComplete();
@@ -195,9 +203,10 @@ class WorkoutSession {
   /// Call when rest is complete and ready for next set
   void startNextSet() {
     if (!_isResting) return;
-    
+
     _isResting = false;
     _counter?.reset();
+    _baselineCaptured = false; // Need to recapture baseline for new set
     _voice.speakNow('Set ${_currentSetIndex + 1}. Go!');
   }
   
@@ -209,6 +218,7 @@ class WorkoutSession {
   /// Reset the current exercise (start over)
   void resetExercise() {
     _counter?.reset();
+    _baselineCaptured = false; // Need to recapture baseline
     _currentSetIndex = 0;
     _isResting = false;
   }

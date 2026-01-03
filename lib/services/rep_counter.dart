@@ -4,7 +4,7 @@ import 'dart:math' as math;
 /// =============================================================================
 /// PROPORTION-BASED REP COUNTER
 /// =============================================================================
-/// 
+///
 /// Uses RATIOS between body parts instead of angles.
 /// Works regardless of phone position/angle because proportions stay constant.
 
@@ -40,83 +40,83 @@ class ExerciseRule {
 
 class RepCounter {
   final ExerciseRule rule;
-  
+
   RepState _state = RepState.ready;
   bool _baselineCaptured = false;
   int _repCount = 0;
   String _feedback = "";
-  
+
   double _baselineTarget = 0;
   double _baselineRuler = 0;
   double _baselineRatio = 0;
   double _currentRatio = 0;
   double _smoothedRatio = 0;
   double _currentPercentage = 100;
-  
+
   static const double _smoothingFactor = 0.3;
-  
+
   RepCounter(this.rule);
-  
+
   bool get isLocked => _baselineCaptured;
   int get repCount => _repCount;
   String get feedback => _feedback;
   double get currentPercentage => _currentPercentage;
   RepState get state => _state;
-  
+
   void captureBaseline(List<PoseLandmark> landmarks) {
     final points = _extractPoints(landmarks);
     if (points == null) {
       _feedback = "Can't see full body";
       return;
     }
-    
+
     _baselineTarget = _distance(points.targetA, points.targetB);
     _baselineRuler = _distance(points.rulerA, points.rulerB);
-    
+
     if (_baselineRuler < 0.01) {
       _feedback = "Move back a bit";
       return;
     }
-    
+
     _baselineRatio = _baselineTarget / _baselineRuler;
     _smoothedRatio = _baselineRatio;
     _baselineCaptured = true;
     _state = RepState.ready;
     _feedback = "LOCKED";
   }
-  
+
   bool processFrame(List<PoseLandmark> landmarks) {
     if (!_baselineCaptured) {
       _feedback = "Waiting for lock";
       return false;
     }
-    
+
     final points = _extractPoints(landmarks);
     if (points == null) {
       _feedback = "Stay in frame";
       return false;
     }
-    
+
     final currentTarget = _distance(points.targetA, points.targetB);
     final currentRuler = _distance(points.rulerA, points.rulerB);
-    
+
     if (currentRuler < 0.01) return false;
-    
+
     final rawRatio = currentTarget / currentRuler;
     _smoothedRatio = (_smoothingFactor * rawRatio) + ((1 - _smoothingFactor) * _smoothedRatio);
     _currentRatio = _smoothedRatio;
-    
+
     if (rule.targetShrinks) {
       _currentPercentage = (_currentRatio / _baselineRatio) * 100;
     } else {
       _currentPercentage = (_baselineRatio / _currentRatio) * 100;
     }
-    
+
     _currentPercentage = _currentPercentage.clamp(0, 150);
-    
+
     final triggerThreshold = rule.triggerPercent * 100;
     final resetThreshold = rule.resetPercent * 100;
-    
+
     switch (_state) {
       case RepState.ready:
       case RepState.up:
@@ -127,7 +127,7 @@ class RepCounter {
           _feedback = rule.cueBad;
         }
         return false;
-        
+
       case RepState.down:
         if (_currentPercentage >= resetThreshold) {
           _state = RepState.up;
@@ -138,31 +138,31 @@ class RepCounter {
         return false;
     }
   }
-  
+
   void reset() {
     _repCount = 0;
     _state = RepState.ready;
     _feedback = "";
   }
-  
+
   _Points? _extractPoints(List<PoseLandmark> landmarks) {
     final map = {for (var lm in landmarks) lm.type: lm};
-    
+
     final targetA = map[rule.targetA];
     final targetB = map[rule.targetB];
     final rulerA = map[rule.rulerA];
     final rulerB = map[rule.rulerB];
-    
+
     if (targetA == null || targetB == null || rulerA == null || rulerB == null) {
       return null;
     }
-    
+
     const minConfidence = 0.3;
     if (targetA.likelihood < minConfidence || targetB.likelihood < minConfidence ||
         rulerA.likelihood < minConfidence || rulerB.likelihood < minConfidence) {
       return null;
     }
-    
+
     return _Points(
       targetA: Offset(targetA.x, targetA.y),
       targetB: Offset(targetB.x, targetB.y),
@@ -170,7 +170,7 @@ class RepCounter {
       rulerB: Offset(rulerB.x, rulerB.y),
     );
   }
-  
+
   double _distance(Offset a, Offset b) {
     return math.sqrt(math.pow(b.x - a.x, 2) + math.pow(b.y - a.y, 2));
   }
@@ -397,12 +397,16 @@ class ExerciseRules {
     'hip_flexor_stretch': hipFlexorStretch, 'butterfly_stretch': butterflyStretch, 'happy_baby': happyBaby,
   };
 
-  static ExerciseRule? getRule(String id) {
+  static ExerciseRule getRule(String id) {
     final normalized = id.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
-    return _rules[normalized];
+    return _rules[normalized]!;
   }
 
-  static bool hasRule(String id) => getRule(id) != null;
+  static bool hasRule(String id) {
+    final normalized = id.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
+    return _rules.containsKey(normalized);
+  }
+
   static int get exerciseCount => _rules.length;
   static List<String> get allIds => _rules.keys.toList();
 }
