@@ -21,6 +21,7 @@ import '../../providers/workout_provider.dart';
 
 // NEW: Import the rep counting system
 import '../../services/workout_session.dart';
+import '../../services/exercise_rules.dart';
 
 class TrainTab extends ConsumerStatefulWidget {
   const TrainTab({super.key});
@@ -196,18 +197,24 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           print('🔴 FORM CHECK: "$_feedback" | Score: $_formScore | HasBadFeedback: $hasBadFormFeedback');
         }
 
-        if (repState == RepState.down) {
-          // User is descending/at bottom - CHARGING state
+        if (hasBadFormFeedback && _formScore < 80) {
+          // BAD FORM DETECTED - Turn skeleton RED
+          print('🚨 SKELETON → RED (bad form detected)');
+          _skeletonState = SkeletonState.error;
+          _chargeProgress = chargeProgress;
+          _powerGaugeFill = chargeProgress;
+        } else if (repState == RepState.goingDown || repState == RepState.down) {
+          // User is descending - CHARGING state
           _skeletonState = SkeletonState.charging;
           _chargeProgress = chargeProgress;
           _powerGaugeFill = chargeProgress;
-        } else if (repState == RepState.up) {
+        } else if (repState == RepState.goingUp) {
           // User is ascending - IDLE state (or keep charging visual briefly)
           _skeletonState = SkeletonState.idle;
           // Keep power gauge filled briefly during ascent
           _powerGaugeFill = chargeProgress;
         } else {
-          // At ready position
+          // At rest position
           _skeletonState = SkeletonState.idle;
           _chargeProgress = 0.0;
           _powerGaugeFill = 0.0;
@@ -378,6 +385,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           _showCountdown = false;
           _countdownComplete = true;
         });
+        // Actually start the exercise
+        _startCurrentExercise();
       }
     });
   }
