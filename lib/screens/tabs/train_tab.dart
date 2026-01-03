@@ -21,7 +21,6 @@ import '../../providers/workout_provider.dart';
 
 // NEW: Import the rep counting system
 import '../../services/workout_session.dart';
-import '../../services/exercise_rules.dart';
 
 class TrainTab extends ConsumerStatefulWidget {
   const TrainTab({super.key});
@@ -203,13 +202,13 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           _skeletonState = SkeletonState.error;
           _chargeProgress = chargeProgress;
           _powerGaugeFill = chargeProgress;
-        } else if (repState == RepState.goingDown || repState == RepState.down) {
-          // User is descending - CHARGING state
+        } else if (repState == RepState.down) {
+          // User is in the down position - CHARGING state
           _skeletonState = SkeletonState.charging;
           _chargeProgress = chargeProgress;
           _powerGaugeFill = chargeProgress;
-        } else if (repState == RepState.goingUp) {
-          // User is ascending - IDLE state (or keep charging visual briefly)
+        } else if (repState == RepState.up) {
+          // User completed rep - back to IDLE
           _skeletonState = SkeletonState.idle;
           // Keep power gauge filled briefly during ascent
           _powerGaugeFill = chargeProgress;
