@@ -74,15 +74,16 @@ class WorkoutSession {
     required int sets,
     required int reps,
   }) async {
-    if (!ExerciseRules.hasRule(exerciseId)) {
+    final rule = ExerciseRules.getRule(exerciseId);
+    
+    if (rule == null) {
       print('⚠️ No tracking rule for: $exerciseId');
       return;
     }
 
-    final rule = ExerciseRules.getRule(exerciseId);
     _currentExercise = rule;
     _counter = RepCounter(rule);
-    _baselineCaptured = false; // Reset baseline flag for new exercise
+    _baselineCaptured = false;
     _targetSets = sets;
     _targetReps = reps;
     _currentSetIndex = 0;
@@ -128,7 +129,7 @@ class WorkoutSession {
   
   void _onRepCompleted() {
     final reps = _counter!.repCount;
-    final score = _counter!.currentPercentage; // Use percentage as form score
+    final score = _counter!.currentPercentage;
 
     // GAMING: Classify rep quality
     final quality = classifyRep(score);
@@ -164,7 +165,7 @@ class WorkoutSession {
     _repHistory.add(RepData(
       quality: quality,
       formScore: score,
-      angle: _counter!.currentPercentage, // Store percentage instead of angle
+      angle: _counter!.currentPercentage,
       timestamp: DateTime.now(),
     ));
 
@@ -206,7 +207,7 @@ class WorkoutSession {
 
     _isResting = false;
     _counter?.reset();
-    _baselineCaptured = false; // Need to recapture baseline for new set
+    _baselineCaptured = false;
     _voice.speakNow('Set ${_currentSetIndex + 1}. Go!');
   }
   
@@ -218,7 +219,7 @@ class WorkoutSession {
   /// Reset the current exercise (start over)
   void resetExercise() {
     _counter?.reset();
-    _baselineCaptured = false; // Need to recapture baseline
+    _baselineCaptured = false;
     _currentSetIndex = 0;
     _isResting = false;
   }
@@ -235,4 +236,3 @@ class WorkoutSession {
     await _voice.dispose();
   }
 }
-
