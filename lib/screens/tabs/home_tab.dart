@@ -7,6 +7,18 @@ import '../../providers/workout_provider.dart';
 import '../../widgets/animated_counter.dart';
 import '../../widgets/sparkline.dart';
 import '../../widgets/premium_animations.dart';
+import '../../widgets/viral_analytics.dart';
+import '../home_screen.dart' show TabNavigator;
+
+/// =============================================================================
+/// HOME TAB - THE MOST ADDICTIVE FITNESS EXPERIENCE EVER BUILT
+/// =============================================================================
+/// This is designed to be CRACK:
+/// - Every tap does something
+/// - Real-time animations everywhere
+/// - Progress you can SEE
+/// - Dopamine triggers at every interaction
+/// =============================================================================
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({super.key});
@@ -18,19 +30,63 @@ class HomeTab extends ConsumerWidget {
     
     return SafeArea(
       child: statsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.cyberLime),
+        loading: () => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(AppColors.cyberLime),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Loading your gains...',
+                style: TextStyle(
+                  color: AppColors.white60,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
         error: (error, stack) => Center(
-          child: Text(
-            'Error loading stats',
-            style: const TextStyle(color: AppColors.white60),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.neonCrimson, size: 64),
+              const SizedBox(height: 16),
+              const Text(
+                'Error loading stats',
+                style: TextStyle(color: AppColors.white60, fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  ref.invalidate(workoutStatsProvider);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.cyberLime,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'RETRY',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         data: (stats) => RefreshIndicator(
           onRefresh: () async {
+            HapticFeedback.mediumImpact();
             ref.invalidate(workoutStatsProvider);
           },
           color: AppColors.cyberLime,
@@ -44,46 +100,63 @@ class HomeTab extends ConsumerWidget {
                 // App branding
                 SlideUpAnimation(
                   delay: 0,
-                  child: _buildAppHeader(),
+                  child: _buildAppHeader(context),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
                 // Streak counter (THE PRESSURE)
                 SlideUpAnimation(
-                  delay: 100,
+                  delay: 50,
                   child: _buildStreakCard(context, stats),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-                // Locked workout (if exists)
+                // Circular stats (VIRAL)
+                SlideUpAnimation(
+                  delay: 100,
+                  child: _buildCircularStats(context, stats),
+                ),
+                const SizedBox(height: 20),
+
+                // Locked workout OR Create workout button
                 if (lockedWorkout != null) ...[
                   SlideUpAnimation(
-                    delay: 200,
+                    delay: 150,
                     child: _buildReadyToTrainCard(context, ref, lockedWorkout),
                   ),
-                  const SizedBox(height: 24),
-                ],
-
-                // Quick start (if no locked workout)
-                if (lockedWorkout == null) ...[
+                ] else ...[
                   SlideUpAnimation(
-                    delay: 200,
-                    child: _buildQuickStartSection(context),
+                    delay: 150,
+                    child: _buildCreateWorkoutButton(context),
                   ),
-                  const SizedBox(height: 24),
                 ],
+                const SizedBox(height: 20),
 
-                // This week progress
+                // Quick start buttons
+                SlideUpAnimation(
+                  delay: 200,
+                  child: _buildQuickStartSection(context),
+                ),
+                const SizedBox(height: 20),
+
+                // Weekly progress bars (ANIMATED)
+                SlideUpAnimation(
+                  delay: 250,
+                  child: _buildWeeklyProgressCard(context, stats),
+                ),
+                const SizedBox(height: 20),
+
+                // Achievements (UNLOCKABLES)
                 SlideUpAnimation(
                   delay: 300,
-                  child: _buildThisWeekCard(stats),
+                  child: _buildAchievementsSection(context, stats),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-                // All-time stats
+                // Trend stats
                 SlideUpAnimation(
-                  delay: 400,
-                  child: _buildAllTimeStatsCard(stats),
+                  delay: 350,
+                  child: _buildTrendStats(context, stats),
                 ),
               ],
             ),
@@ -93,41 +166,60 @@ class HomeTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildAppHeader() {
+  Widget _buildAppHeader(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'SKELETAL',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: AppColors.cyberLime,
-            letterSpacing: 2,
-            shadows: [
-              Shadow(
-                color: AppColors.cyberLime.withOpacity(0.5),
-                blurRadius: 20,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'SKELETAL-PT',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: AppColors.cyberLime,
+                letterSpacing: 1.5,
+                shadows: [
+                  Shadow(
+                    color: AppColors.cyberLime.withOpacity(0.5),
+                    blurRadius: 20,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Your AI Coach',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.white40,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
-        const Text(
-          '-',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: AppColors.white40,
-            letterSpacing: 2,
-          ),
-        ),
-        const Text(
-          'PT',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: 2,
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            // Navigate to settings (tab 3)
+            final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+            if (navigator != null) {
+              (navigator as dynamic).changeTab(3);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.white5,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.white10),
+            ),
+            child: const Icon(
+              Icons.settings,
+              color: AppColors.white70,
+              size: 20,
+            ),
           ),
         ),
       ],
@@ -141,6 +233,13 @@ class HomeTab extends ConsumerWidget {
     final streakCard = GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
+        if (isAtRisk) {
+          // Navigate to workouts tab
+          final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+          if (navigator != null) {
+            (navigator as dynamic).changeTab(1);
+          }
+        }
       },
       child: Container(
         width: double.infinity,
@@ -170,25 +269,15 @@ class HomeTab extends ConsumerWidget {
           ),
           border: Border.all(
             color: isAtRisk
-                ? AppColors.neonCrimson.withOpacity(0.5)
+                ? AppColors.neonCrimson.withOpacity(0.6)
                 : hasStreak
-                    ? AppColors.cyberLime.withOpacity(0.5)
+                    ? AppColors.cyberLime.withOpacity(0.6)
                     : AppColors.white20,
             width: 2,
           ),
-          boxShadow: hasStreak
-              ? [
-                  BoxShadow(
-                    color: (isAtRisk ? AppColors.neonCrimson : AppColors.cyberLime).withOpacity(0.3),
-                    blurRadius: 24,
-                    spreadRadius: 0,
-                  ),
-                ]
-              : null,
         ),
         child: Column(
           children: [
-            // Streak number with animated counter
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -214,9 +303,8 @@ class HomeTab extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             
-            // Status text
             Text(
               hasStreak
                   ? isAtRisk
@@ -224,7 +312,7 @@ class HomeTab extends ConsumerWidget {
                       : 'DAY STREAK'
                   : 'START YOUR STREAK',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: FontWeight.w900,
                 color: isAtRisk
                     ? AppColors.neonCrimson
@@ -235,31 +323,38 @@ class HomeTab extends ConsumerWidget {
               ),
             ),
             
-            // Motivational text
             if (hasStreak) ...[
               const SizedBox(height: 12),
               Text(
                 isAtRisk
-                    ? "Don't break it today!"
+                    ? "Don't lose it! Workout now →"
                     : stats.trainedToday
                         ? 'Beast! Come back tomorrow.'
                         : 'Keep it going!',
                 style: TextStyle(
                   fontSize: 14,
-                  color: isAtRisk ? AppColors.white70 : AppColors.white60,
+                  color: isAtRisk ? AppColors.white90 : AppColors.white60,
+                  fontWeight: isAtRisk ? FontWeight.w700 : FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
               ),
             ],
             
-            // Best streak
             if (stats.longestStreak > stats.currentStreak) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Best: ${stats.longestStreak} days',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.white40,
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.white10,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Personal Best: ${stats.longestStreak} days 🏆',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.white50,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -268,12 +363,12 @@ class HomeTab extends ConsumerWidget {
       ),
     );
 
-    // Wrap with pulsing glow if at risk
     if (isAtRisk) {
       return PulsingGlow(
         glowColor: AppColors.neonCrimson,
-        minOpacity: 0.2,
-        maxOpacity: 0.6,
+        minOpacity: 0.3,
+        maxOpacity: 0.7,
+        duration: const Duration(milliseconds: 1500),
         child: streakCard,
       );
     }
@@ -281,153 +376,302 @@ class HomeTab extends ConsumerWidget {
     return streakCard;
   }
 
+  Widget _buildCircularStats(BuildContext context, WorkoutStats stats) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        color: AppColors.white5,
+        border: Border.all(color: AppColors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'THIS WEEK',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: AppColors.white50,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              CircularStatRing(
+                current: stats.workoutsThisWeek,
+                target: 7,
+                label: 'WORKOUTS',
+                subtitle: '/ 7 days',
+                color: AppColors.cyberLime,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  // Navigate to train tab
+                  final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+                  if (navigator != null) {
+                    (navigator as dynamic).changeTab(1);
+                  }
+                },
+              ),
+              CircularStatRing(
+                current: stats.repsThisWeek,
+                target: stats.repsThisWeek + 100,
+                label: 'TOTAL REPS',
+                color: AppColors.electricCyan,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                },
+              ),
+              CircularStatRing(
+                current: (stats.repsThisWeek / 10).round(),
+                target: 100,
+                label: 'SETS',
+                color: AppColors.neonCrimson,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReadyToTrainCard(BuildContext context, WidgetRef ref, dynamic lockedWorkout) {
     return PulsingGlow(
       glowColor: AppColors.electricCyan,
       minOpacity: 0.2,
       maxOpacity: 0.5,
-      child: Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: RadialGradient(
-          center: Alignment.topRight,
-          radius: 1.5,
-          colors: [
-            AppColors.electricCyan.withOpacity(0.2),
-            AppColors.electricCyan.withOpacity(0.1),
-            Colors.black,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.heavyImpact();
+          // Navigate to train tab
+          final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+          if (navigator != null) {
+            (navigator as dynamic).changeTab(1);
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: RadialGradient(
+              center: Alignment.topRight,
+              radius: 1.5,
+              colors: [
+                AppColors.electricCyan.withOpacity(0.3),
+                AppColors.electricCyan.withOpacity(0.1),
+                Colors.black,
+              ],
+            ),
+            border: Border.all(
+              color: AppColors.electricCyan.withOpacity(0.6),
+              width: 3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.electricCyan.withOpacity(0.3),
+                blurRadius: 24,
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.electricCyan.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.lock,
+                      color: AppColors.electricCyan,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'READY TO TRAIN',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.electricCyan,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              Text(
+                lockedWorkout.name,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildWorkoutStat(
+                    Icons.fitness_center,
+                    '${lockedWorkout.exercises.length}',
+                    'exercises',
+                  ),
+                  const SizedBox(width: 20),
+                  _buildWorkoutStat(
+                    Icons.timer_outlined,
+                    '~${lockedWorkout.estimatedMinutes}',
+                    'minutes',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  color: AppColors.electricCyan,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.electricCyan.withOpacity(0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  'START WORKOUT →',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkoutStat(IconData icon, String value, String label) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.electricCyan, size: 20),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                height: 1,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.white50,
+              ),
+            ),
           ],
         ),
-        border: Border.all(
-          color: AppColors.electricCyan.withOpacity(0.4),
-          width: 2,
+      ],
+    );
+  }
+
+  Widget _buildCreateWorkoutButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.heavyImpact();
+        // Navigate to workouts tab
+        final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+        if (navigator != null) {
+          (navigator as dynamic).changeTab(1);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.cyberLime.withOpacity(0.2),
+              AppColors.cyberLime.withOpacity(0.05),
+            ],
+          ),
+          border: Border.all(
+            color: AppColors.cyberLime.withOpacity(0.5),
+            width: 2,
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.electricCyan.withOpacity(0.2),
-            blurRadius: 20,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.electricCyan.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.lock,
-                  color: AppColors.electricCyan,
-                  size: 18,
-                ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.cyberLime,
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(width: 10),
-              const Text(
-                'READY TO TRAIN',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.white60,
-                  letterSpacing: 1.5,
-                ),
+              child: const Icon(
+                Icons.add,
+                color: Colors.black,
+                size: 32,
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          // Workout name
-          Text(
-            lockedWorkout.name,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: AppColors.electricCyan,
-              height: 1.2,
             ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Stats
-          Text(
-            '${lockedWorkout.exercises.length} exercises • ~${lockedWorkout.estimatedMinutes} min',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.white60,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Buttons
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  // Navigate to Train tab (index 1)
-                  final navigator = context.findAncestorWidgetOfExactType<_TabNavigator>();
-                  if (navigator != null) {
-                    (navigator as dynamic).changeTab(1);
-                  }
-                },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.electricCyan,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.electricCyan.withOpacity(0.4),
-                          blurRadius: 16,
-                        ),
-                      ],
-                    ),
-                    child: const Text(
-                      'START WORKOUT',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                        letterSpacing: 1,
-                      ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Create Workout',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  // Clear locked workout
-                  final notifier = ref.read(lockedWorkoutProvider.notifier);
-                  notifier.state = null;
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.white10,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.white20),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Choose exercises & start training',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.white60,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.close,
-                    color: AppColors.white70,
-                    size: 20,
-                  ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: AppColors.cyberLime,
+              size: 20,
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -438,7 +682,7 @@ class HomeTab extends ConsumerWidget {
         const Text(
           'QUICK START',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: FontWeight.w900,
             color: AppColors.white50,
             letterSpacing: 2,
@@ -450,13 +694,39 @@ class HomeTab extends ConsumerWidget {
             Expanded(
               child: _buildQuickStartButton(
                 context,
-                label: 'BROWSE\nWORKOUTS',
-                icon: Icons.fitness_center,
+                label: 'Browse\nWorkouts',
+                icon: Icons.list,
+                color: AppColors.electricCyan,
+                onTap: () {
+                  final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+                  if (navigator != null) {
+                    (navigator as dynamic).changeTab(1);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickStartButton(
+                context,
+                label: 'My\nProgress',
+                icon: Icons.analytics,
                 color: AppColors.cyberLime,
                 onTap: () {
+                  // Show analytics modal or navigate
                   HapticFeedback.mediumImpact();
-                  // Navigate to workouts tab (index 2)
-                  _navigateToTab(context, 2);
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickStartButton(
+                context,
+                label: 'History',
+                icon: Icons.history,
+                color: AppColors.neonCrimson,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
                 },
               ),
             ),
@@ -479,25 +749,24 @@ class HomeTab extends ConsumerWidget {
         onTap();
       },
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.4), width: 2),
           color: color.withOpacity(0.1),
+          border: Border.all(color: color.withOpacity(0.3), width: 2),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 12),
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: color,
                 height: 1.2,
-                letterSpacing: 0.5,
               ),
             ),
           ],
@@ -506,16 +775,13 @@ class HomeTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildThisWeekCard(WorkoutStats stats) {
-    final hasData = stats.workoutsThisWeek > 0;
-    final progress = stats.workoutsThisWeek / 7;
-    
+  Widget _buildWeeklyProgressCard(BuildContext context, WorkoutStats stats) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.white20, width: 1),
+        borderRadius: BorderRadius.circular(24),
         color: AppColors.white5,
+        border: Border.all(color: AppColors.white10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,263 +790,171 @@ class HomeTab extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'THIS WEEK',
+                'WEEKLY PROGRESS',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
                   color: AppColors.white50,
                   letterSpacing: 2,
                 ),
               ),
-              // Mini sparkline
-              if (hasData)
-                Builder(builder: (context) {
-                  final sparklineData = List<double>.generate(7, (i) {
-                    if (i < stats.workoutsThisWeek) {
-                      return 1.0 + (i % 3) * 0.5;
-                    }
-                    return 0.0;
-                  });
-                  return Sparkline(
-                    data: sparklineData,
-                    width: 60,
-                    height: 20,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.cyberLime.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${((stats.workoutsThisWeek / 7) * 100).toInt()}%',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
                     color: AppColors.cyberLime,
-                    strokeWidth: 2,
-                  );
-                }),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
           
-          // Progress bar
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: AppColors.white10,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: FractionallySizedBox(
-                    widthFactor: progress.clamp(0.0, 1.0),
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.cyberLime,
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: hasData
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.cyberLime.withOpacity(0.4),
-                                  blurRadius: 12,
-                                ),
-                              ]
-                            : null,
-                      ),
-                    ),
-                  ),
-                ),
+          ViralProgressBar(
+            progress: stats.workoutsThisWeek / 7,
+            label: 'Workout Frequency',
+            value: '${stats.workoutsThisWeek}/7 days',
+            startColor: AppColors.cyberLime,
+            endColor: AppColors.electricCyan,
+          ),
+          const SizedBox(height: 20),
+          
+          ViralProgressBar(
+            progress: (stats.repsThisWeek / (stats.repsThisWeek + 100)).clamp(0.0, 1.0),
+            label: 'Total Volume',
+            value: '${stats.repsThisWeek} reps',
+            startColor: AppColors.electricCyan,
+            endColor: AppColors.neonCrimson,
+          ),
+          const SizedBox(height: 20),
+          
+          ViralProgressBar(
+            progress: stats.currentStreak / (stats.currentStreak + 7).clamp(1.0, 365.0),
+            label: 'Consistency',
+            value: '${stats.currentStreak} day streak',
+            startColor: AppColors.neonCrimson,
+            endColor: AppColors.cyberLime,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAchievementsSection(BuildContext context, WorkoutStats stats) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'ACHIEVEMENTS',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: AppColors.white50,
+                letterSpacing: 2,
               ),
-              const SizedBox(width: 12),
-              AnimatedCounter(
-                target: stats.workoutsThisWeek,
-                duration: const Duration(milliseconds: 1000),
-                suffix: '/7',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
+            ),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+              },
+              child: const Text(
+                'View All →',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.cyberLime,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          
-          // Reps comparison
-          if (hasData) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'TOTAL REPS',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.white40,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    AnimatedCounter(
-                      target: stats.repsThisWeek,
-                      duration: const Duration(milliseconds: 1200),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                if (stats.repsLastWeek > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: stats.repsComparison >= 0
-                          ? AppColors.cyberLime.withOpacity(0.2)
-                          : AppColors.neonCrimson.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: stats.repsComparison >= 0
-                            ? AppColors.cyberLime.withOpacity(0.4)
-                            : AppColors.neonCrimson.withOpacity(0.4),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          stats.repsComparison >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                          color: stats.repsComparison >= 0 ? AppColors.cyberLime : AppColors.neonCrimson,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${stats.repsComparison.abs()}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: stats.repsComparison >= 0 ? AppColors.cyberLime : AppColors.neonCrimson,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ] else ...[
-            const Text(
-              'No workouts this week yet.\nTime to start!',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.white60,
-                height: 1.4,
-              ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAllTimeStatsCard(WorkoutStats stats) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.white20, width: 1),
-        color: AppColors.white5,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'ALL-TIME STATS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: AppColors.white50,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          if (stats.totalWorkouts > 0) ...[
-            _buildStatRow('💪', 'Total Workouts', '${stats.totalWorkouts}'),
-            const SizedBox(height: 16),
-            _buildStatRow('🔢', 'Lifetime Reps', '${stats.totalLifetimeReps}'),
-            const SizedBox(height: 16),
-            _buildStatRow('⏱️', 'Time Trained', stats.formattedTrainingTime),
-            if (stats.avgFormScore > 0) ...[
-              const SizedBox(height: 16),
-              _buildStatRow('⭐', 'Avg Form Score', '${stats.avgFormScore.toStringAsFixed(0)}%'),
-            ],
-          ] else ...[
-            const Text(
-              'Complete your first workout to see your stats here!',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.white60,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatRow(String emoji, String label, String value) {
-    // Try to parse the value as a number for animated counting
-    final numValue = int.tryParse(value.replaceAll(RegExp(r'[^\d]'), ''));
-    
-    return Row(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 24)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.white60,
-            ),
-          ),
         ),
-        numValue != null
-            ? AnimatedCounter(
-                target: numValue,
-                duration: const Duration(milliseconds: 1000),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: AchievementBadge(
+                emoji: '🔥',
+                title: 'First Streak',
+                subtitle: '7 days',
+                unlocked: stats.currentStreak >= 7,
               ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AchievementBadge(
+                emoji: '💪',
+                title: 'Century',
+                subtitle: '100 reps',
+                unlocked: stats.totalLifetimeReps >= 100,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AchievementBadge(
+                emoji: '⚡',
+                title: 'Warrior',
+                subtitle: '10 workouts',
+                unlocked: stats.totalWorkouts >= 10,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  void _navigateToTab(BuildContext context, int tabIndex) {
-    final navigator = context.findAncestorWidgetOfExactType<_TabNavigator>();
-    if (navigator != null) {
-      (navigator as dynamic).changeTab(tabIndex);
-    }
+  Widget _buildTrendStats(BuildContext context, WorkoutStats stats) {
+    final weekOverWeekChange = stats.repsLastWeek > 0
+        ? ((stats.repsThisWeek - stats.repsLastWeek) / stats.repsLastWeek * 100).round()
+        : 0;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'TRENDS',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            color: AppColors.white50,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TrendStatCard(
+                label: 'Total Workouts',
+                value: '${stats.totalWorkouts}',
+                trend: '${stats.workoutsThisWeek} this week',
+                isUp: stats.workoutsThisWeek > 0,
+                color: AppColors.cyberLime,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TrendStatCard(
+                label: 'Week Progress',
+                value: weekOverWeekChange >= 0 ? '+$weekOverWeekChange%' : '$weekOverWeekChange%',
+                trend: 'vs last week',
+                isUp: weekOverWeekChange >= 0,
+                color: weekOverWeekChange >= 0 ? AppColors.cyberLime : AppColors.neonCrimson,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
-}
-
-// InheritedWidget to access tab navigation from HomeScreen
-class _TabNavigator extends InheritedWidget {
-  final Function(int) changeTab;
-
-  const _TabNavigator({
-    required this.changeTab,
-    required super.child,
-  });
-
-  @override
-  bool updateShouldNotify(_TabNavigator old) => false;
 }

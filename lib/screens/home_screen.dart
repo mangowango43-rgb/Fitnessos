@@ -47,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return CyberGridBackground(
-      child: _TabNavigator(
+      child: TabNavigator(
         changeTab: changeTab,
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -144,19 +144,19 @@ class _TabInfo {
 }
 
 // InheritedWidget to allow child widgets to change tabs
-class _TabNavigator extends InheritedWidget {
+class TabNavigator extends InheritedWidget {
   final Function(int) changeTab;
 
-  const _TabNavigator({
+  const TabNavigator({
     required this.changeTab,
     required super.child,
   });
 
-  static _TabNavigator? of(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<_TabNavigator>();
+  static TabNavigator? of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<TabNavigator>();
   }
 
   @override
-  bool updateShouldNotify(_TabNavigator old) => changeTab != old.changeTab;
+  bool updateShouldNotify(TabNavigator old) => changeTab != old.changeTab;
 }
 
