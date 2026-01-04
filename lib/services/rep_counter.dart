@@ -156,10 +156,17 @@ class RepCounter {
       _smoothedShoulderY = _baselineShoulderY;
     }
     
-    // PUSH-UP: Capture nose to wrist Y difference (nose should be above wrists at start)
-    final nose = map[PoseLandmarkType.nose];
+    // PUSH-UP: Store Y-distance between shoulders and wrists (vertical gap)
     final lWr = map[PoseLandmarkType.leftWrist];
     final rWr = map[PoseLandmarkType.rightWrist];
+    if (rule.pattern == MovementPattern.push && lSh != null && rSh != null && lWr != null && rWr != null) {
+      double shoulderY = (lSh.y + rSh.y) / 2;
+      double wristY = (lWr.y + rWr.y) / 2;
+      _baselineTarget = (wristY - shoulderY).abs();  // Store Y-distance as baseline
+    }
+    
+    // PUSH-UP: Capture nose to wrist Y difference (nose should be above wrists at start)
+    final nose = map[PoseLandmarkType.nose];
     if (nose != null && lWr != null && rWr != null) {
       double avgWristY = (lWr.y + rWr.y) / 2;
       _baselineNoseWristDiff = avgWristY - nose.y;  // Positive = nose is above wrists
@@ -211,6 +218,25 @@ class RepCounter {
     double baselineRatio = _baselineTarget / _baselineRuler;
     double currentRatio = currentTarget / currentRuler;
     double rawPercentage = (currentRatio / baselineRatio) * 100;
+    
+    // PUSH-UP SPECIAL: Use Y-distance only (vertical drop)
+    // From front view, shoulders DROP toward wrists (Y increases)
+    if (rule.pattern == MovementPattern.push) {
+      final lShoulder = map[PoseLandmarkType.leftShoulder];
+      final rShoulder = map[PoseLandmarkType.rightShoulder];
+      final lWrist = map[PoseLandmarkType.leftWrist];
+      final rWrist = map[PoseLandmarkType.rightWrist];
+      
+      if (lShoulder != null && rShoulder != null && lWrist != null && rWrist != null) {
+        double shoulderY = (lShoulder.y + rShoulder.y) / 2;
+        double wristY = (lWrist.y + rWrist.y) / 2;
+        double currentYDiff = (wristY - shoulderY).abs();  // Vertical distance
+        
+        if (_baselineTarget > 0.01) {
+          rawPercentage = (currentYDiff / _baselineTarget) * 100;
+        }
+      }
+    }
     
     _smoothedPercentage = (_smoothingFactor * rawPercentage) + ((1 - _smoothingFactor) * _smoothedPercentage);
     _currentPercentage = _smoothedPercentage.clamp(0, 150);
@@ -381,9 +407,9 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // SIMPLE: Shoulder-to-wrist distance SHRINKS when you go down
-        // Same logic as squat - just proportion
-        return _currentPercentage <= 75;  // Arms at 75% of starting length = down
+        // SIMPLE: Shoulder-to-wrist Y distance SHRINKS when you go down
+        // Make it EASY to trigger - any noticeable drop counts
+        return _currentPercentage <= 90;  // Gap shrinks to 90% = down
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -402,8 +428,8 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // Arms extend back out
-        return _currentPercentage >= 90;  // Arms back to 90% of starting length = up
+        // Gap grows back
+        return _currentPercentage >= 95;  // Back to 95% = up
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
