@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/app_colors.dart';
 import '../../providers/stats_provider.dart';
 import '../../providers/workout_provider.dart';
+import '../../widgets/animated_counter.dart';
+import '../../widgets/sparkline.dart';
+import '../../widgets/premium_animations.dart';
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({super.key});
@@ -39,31 +42,49 @@ class HomeTab extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // App branding
-                _buildAppHeader(),
+                SlideUpAnimation(
+                  delay: 0,
+                  child: _buildAppHeader(),
+                ),
                 const SizedBox(height: 32),
 
                 // Streak counter (THE PRESSURE)
-                _buildStreakCard(context, stats),
+                SlideUpAnimation(
+                  delay: 100,
+                  child: _buildStreakCard(context, stats),
+                ),
                 const SizedBox(height: 24),
 
                 // Locked workout (if exists)
                 if (lockedWorkout != null) ...[
-                  _buildReadyToTrainCard(context, ref, lockedWorkout),
+                  SlideUpAnimation(
+                    delay: 200,
+                    child: _buildReadyToTrainCard(context, ref, lockedWorkout),
+                  ),
                   const SizedBox(height: 24),
                 ],
 
                 // Quick start (if no locked workout)
                 if (lockedWorkout == null) ...[
-                  _buildQuickStartSection(context),
+                  SlideUpAnimation(
+                    delay: 200,
+                    child: _buildQuickStartSection(context),
+                  ),
                   const SizedBox(height: 24),
                 ],
 
                 // This week progress
-                _buildThisWeekCard(stats),
+                SlideUpAnimation(
+                  delay: 300,
+                  child: _buildThisWeekCard(stats),
+                ),
                 const SizedBox(height: 24),
 
                 // All-time stats
-                _buildAllTimeStatsCard(stats),
+                SlideUpAnimation(
+                  delay: 400,
+                  child: _buildAllTimeStatsCard(stats),
+                ),
               ],
             ),
           ),
@@ -117,7 +138,7 @@ class HomeTab extends ConsumerWidget {
     final hasStreak = stats.currentStreak > 0;
     final isAtRisk = !stats.trainedToday && hasStreak;
 
-    return GestureDetector(
+    final streakCard = GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
       },
@@ -167,7 +188,7 @@ class HomeTab extends ConsumerWidget {
         ),
         child: Column(
           children: [
-            // Streak number
+            // Streak number with animated counter
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -177,8 +198,9 @@ class HomeTab extends ConsumerWidget {
                   style: const TextStyle(fontSize: 48),
                 ),
                 const SizedBox(width: 16),
-                Text(
-                  '${stats.currentStreak}',
+                AnimatedCounter(
+                  target: stats.currentStreak,
+                  duration: const Duration(milliseconds: 1200),
                   style: TextStyle(
                     fontSize: 72,
                     fontWeight: FontWeight.w900,
@@ -245,10 +267,26 @@ class HomeTab extends ConsumerWidget {
         ),
       ),
     );
+
+    // Wrap with pulsing glow if at risk
+    if (isAtRisk) {
+      return PulsingGlow(
+        glowColor: AppColors.neonCrimson,
+        minOpacity: 0.2,
+        maxOpacity: 0.6,
+        child: streakCard,
+      );
+    }
+
+    return streakCard;
   }
 
   Widget _buildReadyToTrainCard(BuildContext context, WidgetRef ref, dynamic lockedWorkout) {
-    return Container(
+    return PulsingGlow(
+      glowColor: AppColors.electricCyan,
+      minOpacity: 0.2,
+      maxOpacity: 0.5,
+      child: Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -389,6 +427,7 @@ class HomeTab extends ConsumerWidget {
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -481,14 +520,36 @@ class HomeTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'THIS WEEK',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: AppColors.white50,
-              letterSpacing: 2,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'THIS WEEK',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.white50,
+                  letterSpacing: 2,
+                ),
+              ),
+              // Mini sparkline
+              if (hasData)
+                Builder(builder: (context) {
+                  final sparklineData = List<double>.generate(7, (i) {
+                    if (i < stats.workoutsThisWeek) {
+                      return 1.0 + (i % 3) * 0.5;
+                    }
+                    return 0.0;
+                  });
+                  return Sparkline(
+                    data: sparklineData,
+                    width: 60,
+                    height: 20,
+                    color: AppColors.cyberLime,
+                    strokeWidth: 2,
+                  );
+                }),
+            ],
           ),
           const SizedBox(height: 20),
           
@@ -523,8 +584,10 @@ class HomeTab extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                '${stats.workoutsThisWeek}/7',
+              AnimatedCounter(
+                target: stats.workoutsThisWeek,
+                duration: const Duration(milliseconds: 1000),
+                suffix: '/7',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -553,8 +616,9 @@ class HomeTab extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '${stats.repsThisWeek}',
+                    AnimatedCounter(
+                      target: stats.repsThisWeek,
+                      duration: const Duration(milliseconds: 1200),
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
@@ -662,6 +726,9 @@ class HomeTab extends ConsumerWidget {
   }
 
   Widget _buildStatRow(String emoji, String label, String value) {
+    // Try to parse the value as a number for animated counting
+    final numValue = int.tryParse(value.replaceAll(RegExp(r'[^\d]'), ''));
+    
     return Row(
       children: [
         Text(emoji, style: const TextStyle(fontSize: 24)),
@@ -675,14 +742,24 @@ class HomeTab extends ConsumerWidget {
             ),
           ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-          ),
-        ),
+        numValue != null
+            ? AnimatedCounter(
+                target: numValue,
+                duration: const Duration(milliseconds: 1000),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
       ],
     );
   }

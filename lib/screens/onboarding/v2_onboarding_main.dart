@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/app_colors.dart';
+import '../../widgets/premium_animations.dart';
 import '../home_screen.dart';
 
 /// Elite high-converting onboarding flow
@@ -140,48 +141,57 @@ class _V2OnboardingMainState extends ConsumerState<V2OnboardingMain> {
         children: [
           const Spacer(),
           // Placeholder for video/animation
-          Container(
-            height: 300,
-            margin: const EdgeInsets.symmetric(horizontal: 32),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.cyberLime, width: 2),
-              color: AppColors.white5,
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.play_circle_outline, size: 64, color: AppColors.cyberLime),
-                  SizedBox(height: 16),
-                  Text(
-                    '[Demo Video Here]',
-                    style: TextStyle(color: AppColors.white40, fontSize: 14),
-                  ),
-                ],
+          SlideUpAnimation(
+            delay: 100,
+            child: Container(
+              height: 300,
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.cyberLime, width: 2),
+                color: AppColors.white5,
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.play_circle_outline, size: 64, color: AppColors.cyberLime),
+                    SizedBox(height: 16),
+                    Text(
+                      '[Demo Video Here]',
+                      style: TextStyle(color: AppColors.white40, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(height: 40),
-          const Text(
-            'Join 100,000+ Athletes',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              height: 1.1,
+          SlideUpAnimation(
+            delay: 200,
+            child: const Text(
+              'Join 100,000+ Athletes',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                height: 1.1,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Who never miss a workout',
-            style: TextStyle(
-              fontSize: 18,
-              color: AppColors.white60,
-              height: 1.4,
+          SlideUpAnimation(
+            delay: 300,
+            child: const Text(
+              'Who never miss a workout',
+              style: TextStyle(
+                fontSize: 18,
+                color: AppColors.white60,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
           // Testimonials
