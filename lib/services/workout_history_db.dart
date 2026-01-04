@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import 'package:path/path.dart' as path_helper;
 import '../models/workout_session_model.dart';
 import '../models/exercise_model.dart';
 
@@ -19,10 +19,10 @@ class WorkoutHistoryDB {
 
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+    final fullPath = path_helper.join(dbPath, filePath);
 
     return await openDatabase(
-      path,
+      fullPath,
       version: 1,
       onCreate: _createDB,
     );

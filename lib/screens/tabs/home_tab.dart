@@ -368,7 +368,8 @@ class HomeTab extends ConsumerWidget {
                 onTap: () {
                   HapticFeedback.lightImpact();
                   // Clear locked workout
-                  ref.read(lockedWorkoutProvider.notifier).state = null;
+                  final notifier = ref.read(lockedWorkoutProvider.notifier);
+                  notifier.state = null;
                 },
                 child: Container(
                   padding: const EdgeInsets.all(16),
