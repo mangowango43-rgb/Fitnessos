@@ -2,15 +2,13 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'dart:math' as math;
 
 /// =============================================================================
-/// THE UNICORN ENGINE - HYBRID DETECTION
+/// THE UNICORN ENGINE - FIXED REFERENCES
 /// =============================================================================
 /// 
-/// 3 CORE PATTERNS:
-/// - SQUAT (Knee Chain): Proportion method + shoulder-width ruler from front
-/// - HINGE (Hip Chain): Angle method (hip angle)
-/// - PUSH (Elbow Chain): DUAL VALIDATION - angle OR distance
-/// 
-/// If we nail these 3, all 120+ exercises work.
+/// FIXES:
+/// 1. Squat ruler = HIP-TO-HIP width (not shoulders - shoulders move with barbell)
+/// 2. Push-up = Track SHOULDER Y-POSITION dropping (vertical movement visible from any angle)
+/// 3. Deadlift = Hip angle (already working)
 /// =============================================================================
 
 enum RepState { ready, down, up }
@@ -22,18 +20,18 @@ class ExerciseRule {
   final String name;
   final MovementPattern pattern;
   
-  // For PROPORTION tracking (Squat pattern)
+  // For PROPORTION tracking
   final PoseLandmarkType targetA;
   final PoseLandmarkType targetB;
-  final double triggerPercent;  // e.g., 0.78 = 78% of baseline
-  final double resetPercent;    // e.g., 0.92 = 92% of baseline
+  final double triggerPercent;
+  final double resetPercent;
   
-  // For ANGLE tracking (Hinge/Push patterns)
+  // For ANGLE tracking
   final PoseLandmarkType? jointA;
   final PoseLandmarkType? jointVertex;
   final PoseLandmarkType? jointB;
-  final double triggerAngle;    // e.g., 90 degrees
-  final double resetAngle;      // e.g., 160 degrees
+  final double triggerAngle;
+  final double resetAngle;
   
   final String cueGood;
   final String cueBad;
@@ -66,12 +64,14 @@ class RepCounter {
   // Baseline values
   double _baselineTarget = 0;
   double _baselineRuler = 0;
+  double _baselineShoulderY = 0;  // For push-ups: starting shoulder height
   
-  // Current values for UI
+  // Current values
   double _currentPercentage = 100;
   double _currentAngle = 180;
   double _smoothedPercentage = 100;
   double _smoothedAngle = 180;
+  double _smoothedShoulderY = 0;
   
   // Anti-ghost
   static const double _smoothingFactor = 0.3;
@@ -86,7 +86,7 @@ class RepCounter {
   double get currentPercentage => _currentPercentage;
   RepState get state => _state;
 
-  /// 3D Angle calculation using dot product
+  /// 3D Angle calculation
   double _calculateAngle(PoseLandmark a, PoseLandmark v, PoseLandmark b) {
     double v1x = a.x - v.x, v1y = a.y - v.y, v1z = a.z - v.z;
     double v2x = b.x - v.x, v2y = b.y - v.y, v2z = b.z - v.z;
@@ -101,7 +101,7 @@ class RepCounter {
     return math.acos(cosAngle) * 180 / math.pi;
   }
 
-  /// 3D Distance calculation
+  /// 3D Distance
   double _dist3D(PoseLandmark a, PoseLandmark b) {
     return math.sqrt(
       math.pow(b.x - a.x, 2) + 
@@ -123,15 +123,22 @@ class RepCounter {
     
     _baselineTarget = _dist3D(tA, tB);
     
-    // SHOULDER-WIDTH RULER for front view (the fix that made squats work)
+    // HIP-TO-HIP RULER (the fix - hips don't move when holding barbell)
+    final lHip = map[PoseLandmarkType.leftHip];
+    final rHip = map[PoseLandmarkType.rightHip];
+    
+    if (lHip != null && rHip != null && lHip.likelihood > 0.5 && rHip.likelihood > 0.5) {
+      _baselineRuler = _dist3D(lHip, rHip);
+    } else {
+      _baselineRuler = _baselineTarget;
+    }
+    
+    // For PUSH pattern: capture shoulder Y position (height from ground)
     final lSh = map[PoseLandmarkType.leftShoulder];
     final rSh = map[PoseLandmarkType.rightShoulder];
-    
-    if (lSh != null && rSh != null && lSh.likelihood > 0.6 && rSh.likelihood > 0.6) {
-      _baselineRuler = _dist3D(lSh, rSh);
-    } else {
-      // Fallback to target distance as ruler
-      _baselineRuler = _baselineTarget;
+    if (lSh != null && rSh != null) {
+      _baselineShoulderY = (lSh.y + rSh.y) / 2;  // Average shoulder Y
+      _smoothedShoulderY = _baselineShoulderY;
     }
     
     if (_baselineRuler < 0.01 || _baselineTarget < 0.01) {
@@ -165,17 +172,17 @@ class RepCounter {
     // Calculate current distance
     double currentTarget = _dist3D(tA, tB);
     
-    // Get shoulder-width ruler (front view fix)
+    // HIP-TO-HIP ruler (fixed reference)
     double currentRuler = _baselineRuler;
-    final lSh = map[PoseLandmarkType.leftShoulder];
-    final rSh = map[PoseLandmarkType.rightShoulder];
-    if (lSh != null && rSh != null && lSh.likelihood > 0.6 && rSh.likelihood > 0.6) {
-      currentRuler = _dist3D(lSh, rSh);
+    final lHip = map[PoseLandmarkType.leftHip];
+    final rHip = map[PoseLandmarkType.rightHip];
+    if (lHip != null && rHip != null && lHip.likelihood > 0.5 && rHip.likelihood > 0.5) {
+      currentRuler = _dist3D(lHip, rHip);
     }
     
     if (currentRuler < 0.01) currentRuler = _baselineRuler;
     
-    // Calculate proportion (normalized by ruler)
+    // Proportion calculation
     double baselineRatio = _baselineTarget / _baselineRuler;
     double currentRatio = currentTarget / currentRuler;
     double rawPercentage = (currentRatio / baselineRatio) * 100;
@@ -183,7 +190,7 @@ class RepCounter {
     _smoothedPercentage = (_smoothingFactor * rawPercentage) + ((1 - _smoothingFactor) * _smoothedPercentage);
     _currentPercentage = _smoothedPercentage.clamp(0, 150);
     
-    // Calculate angle if joints are defined
+    // Angle calculation (for hinge/pull/curl)
     double rawAngle = 180;
     if (rule.jointA != null && rule.jointVertex != null && rule.jointB != null) {
       final jA = map[rule.jointA];
@@ -197,9 +204,19 @@ class RepCounter {
     _smoothedAngle = (_smoothingFactor * rawAngle) + ((1 - _smoothingFactor) * _smoothedAngle);
     _currentAngle = _smoothedAngle;
     
-    // Determine if "down" position based on pattern
-    bool isDown = _checkIsDown();
-    bool isReset = _checkIsReset();
+    // Shoulder Y tracking (for push-ups)
+    final lSh = map[PoseLandmarkType.leftShoulder];
+    final rSh = map[PoseLandmarkType.rightShoulder];
+    double currentShoulderY = _baselineShoulderY;
+    if (lSh != null && rSh != null) {
+      double rawShoulderY = (lSh.y + rSh.y) / 2;
+      _smoothedShoulderY = (_smoothingFactor * rawShoulderY) + ((1 - _smoothingFactor) * _smoothedShoulderY);
+      currentShoulderY = _smoothedShoulderY;
+    }
+    
+    // Check down/reset based on pattern
+    bool isDown = _checkIsDown(currentShoulderY);
+    bool isReset = _checkIsReset(currentShoulderY);
     
     switch (_state) {
       case RepState.ready:
@@ -232,35 +249,38 @@ class RepCounter {
     }
   }
 
-  /// Check if user is in "down" position
-  bool _checkIsDown() {
+  bool _checkIsDown(double currentShoulderY) {
     switch (rule.pattern) {
       case MovementPattern.squat:
-        // Proportion only: hip-to-ankle drops to 78% of baseline
+        // Proportion: hip-to-ankle drops
         return _currentPercentage <= (rule.triggerPercent * 100);
         
       case MovementPattern.hinge:
-        // Angle only: hip angle closes
+        // Angle: hip angle closes
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // DUAL VALIDATION: Either angle OR proportion triggers
-        bool angleTriggered = _currentAngle <= rule.triggerAngle;
-        bool proportionTriggered = _currentPercentage <= (rule.triggerPercent * 100);
-        return angleTriggered || proportionTriggered;
+        // PUSH-UP FIX: Track shoulder Y moving DOWN (Y increases as you go down in screen coords)
+        // Shoulder Y increases by 15%+ of hip width = you went down
+        double yDrop = currentShoulderY - _baselineShoulderY;
+        double hipWidth = _baselineRuler;
+        double dropRatio = yDrop / hipWidth;
+        
+        // Also check elbow angle as backup
+        bool shoulderDropped = dropRatio >= 0.20;  // Shoulder dropped 20% of hip width
+        bool elbowBent = _currentAngle <= rule.triggerAngle;
+        
+        return shoulderDropped || elbowBent;
         
       case MovementPattern.pull:
-        // Angle: elbow closes
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.curl:
-        // Angle: elbow closes tight
         return _currentAngle <= rule.triggerAngle;
     }
   }
 
-  /// Check if user has returned to start position
-  bool _checkIsReset() {
+  bool _checkIsReset(double currentShoulderY) {
     switch (rule.pattern) {
       case MovementPattern.squat:
         return _currentPercentage >= (rule.resetPercent * 100);
@@ -269,10 +289,15 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // DUAL: Both must reset (more strict on reset to prevent ghost reps)
-        bool angleReset = _currentAngle >= rule.resetAngle;
-        bool proportionReset = _currentPercentage >= (rule.resetPercent * 100);
-        return angleReset && proportionReset;
+        // Reset: shoulder Y back near baseline
+        double yDrop = currentShoulderY - _baselineShoulderY;
+        double hipWidth = _baselineRuler;
+        double dropRatio = yDrop / hipWidth;
+        
+        bool shoulderUp = dropRatio <= 0.08;  // Shoulder within 8% of start
+        bool elbowStraight = _currentAngle >= rule.resetAngle;
+        
+        return shoulderUp || elbowStraight;
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
@@ -291,7 +316,7 @@ class RepCounter {
 }
 
 /// =============================================================================
-/// EXERCISE LIBRARY - ALL 120+ MAPPED TO 5 PATTERNS
+/// EXERCISE LIBRARY
 /// =============================================================================
 
 class ExerciseRules {
@@ -311,8 +336,7 @@ class ExerciseRules {
   static final Map<String, ExerciseRule> _rules = {
     
     // =========================================================================
-    // SQUAT PATTERN - Proportion method (hip-to-ankle with shoulder-width ruler)
-    // Trigger: 78% of baseline (parallel depth)
+    // SQUAT PATTERN - Hip-to-ankle with HIP-WIDTH ruler
     // =========================================================================
     ..._squat(['squats', 'air_squats', 'goblet_squats', 'front_squat', 'back_squat', 'sumo_squat'], 
         0.78, 0.92, "Depth!", "Hit parallel!"),
@@ -328,8 +352,7 @@ class ExerciseRules {
         0.78, 0.92, "Push!", "Full range!"),
 
     // =========================================================================
-    // HINGE PATTERN - Angle method (hip angle: shoulder-hip-knee)
-    // Trigger: Hip angle closes to ~100-110°
+    // HINGE PATTERN - Hip angle
     // =========================================================================
     ..._hinge(['deadlift', 'sumo_deadlift'], 
         105, 165, "Lockout!", "Hips forward!"),
@@ -338,30 +361,28 @@ class ExerciseRules {
     ..._hinge(['kettlebell_swings', 'cable_pullthrough'], 
         110, 170, "Snap!", "Hips drive!"),
     ..._hinge(['glute_bridge', 'hip_thrust', 'single_leg_glute_bridge', 'banded_glute_bridge', 'frog_pumps'], 
-        160, 110, "Squeeze!", "Hips up!"),  // Note: reversed - hips OPEN
+        160, 110, "Squeeze!", "Hips up!"),
     ..._hinge(['good_mornings'],
         100, 160, "Feel it!", "Hinge!"),
 
     // =========================================================================
-    // PUSH PATTERN - DUAL VALIDATION (angle OR proportion)
-    // Angle: Elbow closes to ~90°
-    // Proportion: Shoulder-to-wrist drops to ~75%
+    // PUSH PATTERN - Shoulder Y drop OR elbow angle
     // =========================================================================
     ..._push(['pushups', 'push_ups', 'wide_pushups', 'diamond_pushups', 'close_grip_push_ups'], 
-        95, 155, 0.75, 0.90, "Perfect!", "Go lower!"),
+        95, 155, "Perfect!", "Go lower!"),
     ..._push(['bench_press', 'incline_press', 'decline_press', 'dumbbell_press', 'close_grip_bench'], 
-        90, 150, 0.70, 0.88, "Good depth!", "Touch chest!"),
+        90, 150, "Good depth!", "Touch chest!"),
     ..._push(['tricep_dips', 'tricep_dips_chair', 'dips_chest'], 
-        90, 155, 0.75, 0.90, "Nice dip!", "Get to 90!"),
+        90, 155, "Nice dip!", "Get to 90!"),
     ..._push(['overhead_press', 'shoulder_press', 'arnold_press', 'seated_db_press', 'pike_push_ups'], 
-        155, 90, 0.75, 0.90, "Lockout!", "Press up!"),  // Note: reversed - arms EXTEND
+        155, 90, "Lockout!", "Press up!"),
     ..._push(['plank_to_pushup'],
-        95, 155, 0.75, 0.90, "Up!", "Down!"),
+        95, 155, "Up!", "Down!"),
     ..._push(['chest_flys', 'cable_crossovers', 'dumbbell_flyes'],
-        95, 155, 0.70, 0.88, "Squeeze!", "Together!"),
+        95, 155, "Squeeze!", "Together!"),
 
     // =========================================================================
-    // PULL PATTERN - Angle method (elbow closes)
+    // PULL PATTERN - Elbow angle
     // =========================================================================
     ..._pull(['pull_ups', 'pullups', 'chin_ups'], 
         75, 155, "Chin up!", "Full hang!"),
@@ -377,20 +398,20 @@ class ExerciseRules {
         85, 150, "Back!", "Pull wide!"),
 
     // =========================================================================
-    // CURL PATTERN - Angle method (elbow closes tight)
+    // CURL PATTERN - Elbow angle tight
     // =========================================================================
     ..._curl(['bicep_curls', 'hammer_curls', 'barbell_curl', 'ez_bar_curl'], 
         50, 145, "Full curl!", "Squeeze!"),
     ..._curl(['preacher_curls', 'concentration_curls', 'cable_curls', 'incline_curls'], 
         45, 140, "Peak!", "Control!"),
     ..._curl(['tricep_extensions', 'overhead_tricep', 'tricep_pushdown', 'skull_crushers', 'tricep_kickbacks'], 
-        150, 85, "Lockout!", "Extend!"),  // Note: reversed - arm EXTENDS
+        150, 85, "Lockout!", "Extend!"),
 
     // =========================================================================
-    // ADDITIONAL EXERCISES - Mapped to closest pattern
+    // ADDITIONAL - Mapped to closest pattern
     // =========================================================================
     
-    // Core (use squat pattern - proportion based)
+    // Core
     ..._squat(['sit_ups', 'situps', 'crunches', 'decline_sit_up'], 
         0.70, 0.90, "Crunch!", "Squeeze abs!"),
     ..._squat(['leg_raises', 'hanging_leg_raise'],
@@ -404,7 +425,7 @@ class ExerciseRules {
     ..._squat(['superman_raises', 'superman', 'dead_bug'],
         0.80, 0.92, "Fly!", "Extend!"),
 
-    // Cardio (use squat pattern)
+    // Cardio
     ..._squat(['burpees', 'sprawls'], 
         0.65, 0.90, "Explode!", "Chest down!"),
     ..._squat(['jumping_jacks', 'star_jumps'],
@@ -416,21 +437,21 @@ class ExerciseRules {
     ..._squat(['skaters', 'lateral_hops'],
         0.80, 0.92, "Jump!", "Side to side!"),
 
-    // Booty (use hinge pattern)
+    // Booty
     ..._hinge(['donkey_kicks', 'donkey_kick_pulses', 'banded_kickback'], 
         155, 100, "Kick!", "Squeeze glute!"),
     ..._squat(['fire_hydrants', 'banded_fire_hydrant', 'clamshells', 'banded_clamshell'],
         0.80, 0.92, "Open!", "Control!"),
 
-    // Shoulders (use push pattern)
+    // Shoulders
     ..._push(['lateral_raises', 'front_raises', 'cable_lateral_raise'],
-        150, 90, 0.80, 0.92, "Arms up!", "To shoulders!"),
+        150, 90, "Arms up!", "To shoulders!"),
     ..._push(['rear_delt_flys', 'upright_rows'],
-        100, 150, 0.75, 0.90, "Pull!", "Elbows high!"),
+        100, 150, "Pull!", "Elbows high!"),
     ..._push(['shrugs'],
-        170, 160, 0.92, 0.97, "High!", "Squeeze!"),
+        170, 160, "High!", "Squeeze!"),
 
-    // Stretches (use squat pattern - just tracking position)
+    // Stretches
     ..._squat(['childs_pose', 'cat_cow', 'worlds_greatest_stretch'],
         0.70, 0.90, "Breathe!", "Deep!"),
     ..._squat(['hamstring_stretch', 'quad_stretch', 'hip_flexor_stretch'],
@@ -443,7 +464,6 @@ class ExerciseRules {
   // PATTERN GENERATORS
   // =========================================================================
 
-  /// SQUAT pattern: Hip-to-Ankle proportion with shoulder-width ruler
   static Map<String, ExerciseRule> _squat(List<String> ids, double trigger, double reset, String good, String bad) {
     return {
       for (var id in ids) id: ExerciseRule(
@@ -460,7 +480,6 @@ class ExerciseRules {
     };
   }
 
-  /// HINGE pattern: Hip angle (Shoulder-Hip-Knee)
   static Map<String, ExerciseRule> _hinge(List<String> ids, double trigger, double reset, String good, String bad) {
     return {
       for (var id in ids) id: ExerciseRule(
@@ -480,8 +499,7 @@ class ExerciseRules {
     };
   }
 
-  /// PUSH pattern: DUAL VALIDATION (Elbow angle OR Shoulder-to-Wrist proportion)
-  static Map<String, ExerciseRule> _push(List<String> ids, double trigAngle, double resetAngle, double trigPct, double resetPct, String good, String bad) {
+  static Map<String, ExerciseRule> _push(List<String> ids, double trigAngle, double resetAngle, String good, String bad) {
     return {
       for (var id in ids) id: ExerciseRule(
         id: id,
@@ -489,8 +507,6 @@ class ExerciseRules {
         pattern: MovementPattern.push,
         targetA: _sh,
         targetB: _wr,
-        triggerPercent: trigPct,
-        resetPercent: resetPct,
         jointA: _sh,
         jointVertex: _el,
         jointB: _wr,
@@ -502,7 +518,6 @@ class ExerciseRules {
     };
   }
 
-  /// PULL pattern: Elbow angle (Shoulder-Elbow-Wrist)
   static Map<String, ExerciseRule> _pull(List<String> ids, double trigger, double reset, String good, String bad) {
     return {
       for (var id in ids) id: ExerciseRule(
@@ -522,7 +537,6 @@ class ExerciseRules {
     };
   }
 
-  /// CURL pattern: Elbow angle tight
   static Map<String, ExerciseRule> _curl(List<String> ids, double trigger, double reset, String good, String bad) {
     return {
       for (var id in ids) id: ExerciseRule(
