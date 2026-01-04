@@ -216,6 +216,7 @@ class RepCounter {
     _currentPercentage = _smoothedPercentage.clamp(0, 150);
     
     // Angle calculation (for hinge/pull/curl)
+    // For PUSH pattern: Check BOTH arms and use the one with better visibility
     double rawAngle = 180;
     if (rule.jointA != null && rule.jointVertex != null && rule.jointB != null) {
       final jA = map[rule.jointA];
@@ -226,6 +227,46 @@ class RepCounter {
         rawAngle = _calculateAngle(jA, jV, jB);
       }
     }
+    
+    // PUSH-UP FIX: Track BOTH arms and use the better one
+    if (rule.pattern == MovementPattern.push) {
+      final lShoulder = map[PoseLandmarkType.leftShoulder];
+      final lElbow = map[PoseLandmarkType.leftElbow];
+      final lWrist = map[PoseLandmarkType.leftWrist];
+      final rShoulder = map[PoseLandmarkType.rightShoulder];
+      final rElbow = map[PoseLandmarkType.rightElbow];
+      final rWrist = map[PoseLandmarkType.rightWrist];
+      
+      double leftAngle = 180;
+      double rightAngle = 180;
+      double leftLikelihood = 0;
+      double rightLikelihood = 0;
+      
+      // Calculate left arm angle
+      if (lShoulder != null && lElbow != null && lWrist != null) {
+        leftAngle = _calculateAngle(lShoulder, lElbow, lWrist);
+        leftLikelihood = (lShoulder.likelihood + lElbow.likelihood + lWrist.likelihood) / 3;
+      }
+      
+      // Calculate right arm angle
+      if (rShoulder != null && rElbow != null && rWrist != null) {
+        rightAngle = _calculateAngle(rShoulder, rElbow, rWrist);
+        rightLikelihood = (rShoulder.likelihood + rElbow.likelihood + rWrist.likelihood) / 3;
+      }
+      
+      // Use the arm with BETTER visibility (higher likelihood)
+      // OR use the more bent angle (lower value = more bent)
+      if (leftLikelihood > 0.3 || rightLikelihood > 0.3) {
+        if (leftLikelihood > rightLikelihood) {
+          rawAngle = leftAngle;
+        } else {
+          rawAngle = rightAngle;
+        }
+        // Actually, use the MORE BENT angle (smaller value) - that's the working arm
+        rawAngle = leftAngle < rightAngle ? leftAngle : rightAngle;
+      }
+    }
+    
     _smoothedAngle = (_smoothingFactor * rawAngle) + ((1 - _smoothingFactor) * _smoothedAngle);
     _currentAngle = _smoothedAngle;
     
@@ -340,10 +381,9 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // SHOULDER WIDTH: From front, shoulders get WIDER as you go down
-        // Track shoulder-to-shoulder distance increasing
-        // currentPercentage > 100 means wider than baseline
-        return _currentPercentage >= 110;  // Shoulders 10% wider = you're down
+        // ELBOW ANGLE: Now tracking BOTH arms, using the more bent one
+        // When arm bends to 90 degrees or less = you're down
+        return _currentAngle <= 110;
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -362,8 +402,8 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // SHOULDER WIDTH: Back to near baseline = you're back up
-        return _currentPercentage <= 105;  // Shoulders within 5% of baseline = back up
+        // ELBOW ANGLE: Arms straighten back out
+        return _currentAngle >= 150;
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
