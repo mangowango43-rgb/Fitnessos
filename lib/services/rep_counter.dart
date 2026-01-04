@@ -72,11 +72,13 @@ class RepCounter {
   double _smoothedPercentage = 100;
   double _smoothedAngle = 180;
   double _smoothedShoulderY = 0;
+  double _contractionRatio = 2.0;  // For push-ups: arm length / upper arm length
   
   // Anti-ghost
   static const double _smoothingFactor = 0.3;
   DateTime? _intentTimer;
-  static const int _intentDelayMs = 150;
+  DateTime _lastRepTime = DateTime.now();  // Anti-rapid-fire for push-ups
+  static const int _intentDelayMs = 250;   // Increased to 250ms
   
   RepCounter(this.rule);
   
@@ -222,6 +224,19 @@ class RepCounter {
       currentShoulderY = _smoothedShoulderY;
     }
     
+    // PUSH-UP FIX: Contraction ratio (arm length / upper arm length)
+    // Upper arm bone NEVER changes - it's your actual bone
+    final lEl = map[PoseLandmarkType.leftElbow];
+    final lWr = map[PoseLandmarkType.leftWrist];
+    if (lSh != null && lEl != null && lWr != null) {
+      double armLength = _dist3D(lSh, lWr);       // Full arm: shoulder to wrist
+      double upperArm = _dist3D(lSh, lEl);        // Fixed bone: shoulder to elbow
+      if (upperArm > 0.01) {
+        double rawRatio = armLength / upperArm;
+        _contractionRatio = (_smoothingFactor * rawRatio) + ((1 - _smoothingFactor) * _contractionRatio);
+      }
+    }
+    
     // Check down/reset based on pattern
     bool isDown = _checkIsDown(currentShoulderY);
     bool isReset = _checkIsReset(currentShoulderY);
@@ -273,10 +288,14 @@ class RepCounter {
         
       case RepState.goingUp:
         if (isReset) {
-          _state = RepState.up;
-          _repCount++;
-          _feedback = "";
-          return true;  // REP COUNTED
+          // ANTI-RAPID-FIRE: Must wait 500ms between reps (no human does 15 reps/second)
+          if (DateTime.now().difference(_lastRepTime).inMilliseconds > 500) {
+            _state = RepState.up;
+            _repCount++;
+            _lastRepTime = DateTime.now();
+            _feedback = "";
+            return true;  // REP COUNTED
+          }
         } else {
           // Went back down
           _state = RepState.down;
@@ -296,9 +315,12 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // Simple: Elbow angle only. 110 degrees = don't need to go super low
-        bool elbowBent = _currentAngle <= 110;
-        return elbowBent;
+        // FIXED BONE STRATEGY: Elbow angle + contraction ratio
+        // Elbow must bend AND arm must contract (wrist closer to shoulder)
+        // contractionRatio: ~2.0 when extended, ~1.2 when bent
+        bool elbowBent = _currentAngle <= 100;
+        bool armContracted = _contractionRatio < 1.5;
+        return elbowBent && armContracted;
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -317,9 +339,10 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // Simple: Elbow angle only. 145 degrees = arms mostly straight
-        bool elbowStraight = _currentAngle >= 145;
-        return elbowStraight;
+        // Must extend arm AND elbow must straighten
+        bool elbowStraight = _currentAngle >= 150;
+        bool armExtended = _contractionRatio > 1.7;
+        return elbowStraight && armExtended;
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
