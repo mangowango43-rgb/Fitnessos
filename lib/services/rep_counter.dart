@@ -343,7 +343,7 @@ class RepCounter {
         // SHOULDER WIDTH: From front, shoulders get WIDER as you go down
         // Track shoulder-to-shoulder distance increasing
         // currentPercentage > 100 means wider than baseline
-        return _currentPercentage >= 115;  // Shoulders 15% wider = you're down
+        return _currentPercentage >= 110;  // Shoulders 10% wider = you're down
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
