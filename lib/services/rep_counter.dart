@@ -11,7 +11,7 @@ import 'dart:math' as math;
 /// 3. Deadlift = Hip angle (already working)
 /// =============================================================================
 
-enum RepState { ready, down, up }
+enum RepState { ready, goingDown, down, goingUp, up }
 
 enum MovementPattern { squat, hinge, push, pull, curl }
 
@@ -85,6 +85,14 @@ class RepCounter {
   String get feedback => _feedback;
   double get currentPercentage => _currentPercentage;
   RepState get state => _state;
+  
+  /// Charge progress for power gauge (0.0 to 1.0)
+  double get chargeProgress {
+    // Convert percentage to 0-1 range (100% = 0, triggerPercent = 1.0)
+    double trigger = rule.triggerPercent * 100;
+    double progress = (100 - _currentPercentage) / (100 - trigger);
+    return progress.clamp(0.0, 1.0);
+  }
 
   /// 3D Angle calculation
   double _calculateAngle(PoseLandmark a, PoseLandmark v, PoseLandmark b) {
@@ -227,23 +235,51 @@ class RepCounter {
             _state = RepState.down;
             _feedback = rule.cueGood;
             _intentTimer = null;
+          } else {
+            // Still waiting for intent confirmation - show as going down
+            _state = RepState.goingDown;
           }
         } else {
           _intentTimer = null;
-          if (!isReset) {
+          _state = RepState.ready;
+          if (!isReset && _currentPercentage < 95) {
             _feedback = rule.cueBad;
           } else {
             _feedback = "";
           }
         }
         return false;
+        
+      case RepState.goingDown:
+        if (isDown) {
+          _intentTimer ??= DateTime.now();
+          if (DateTime.now().difference(_intentTimer!).inMilliseconds > _intentDelayMs) {
+            _state = RepState.down;
+            _feedback = rule.cueGood;
+            _intentTimer = null;
+          }
+        } else {
+          // Moved back up before confirming
+          _intentTimer = null;
+          _state = RepState.ready;
+        }
+        return false;
 
       case RepState.down:
+        if (isReset) {
+          _state = RepState.goingUp;
+        }
+        return false;
+        
+      case RepState.goingUp:
         if (isReset) {
           _state = RepState.up;
           _repCount++;
           _feedback = "";
-          return true;
+          return true;  // REP COUNTED
+        } else {
+          // Went back down
+          _state = RepState.down;
         }
         return false;
     }
@@ -260,18 +296,9 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // PUSH-UP FIX: Track shoulder Y moving DOWN (Y increases as you go down in screen coords)
-        // Shoulder Y increases by 35%+ of hip width = you went down
-        double yDrop = currentShoulderY - _baselineShoulderY;
-        double hipWidth = _baselineRuler;
-        double dropRatio = yDrop / hipWidth;
-        
-        // Also check elbow angle as backup
-        bool shoulderDropped = dropRatio >= 0.35;  // Shoulder dropped 35% of hip width
-        bool elbowBent = _currentAngle <= rule.triggerAngle;
-        
-        // FIX: Use AND - both must be true to trigger
-        return shoulderDropped && elbowBent;
+        // Simple: Elbow angle only. 110 degrees = don't need to go super low
+        bool elbowBent = _currentAngle <= 110;
+        return elbowBent;
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -290,16 +317,9 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // Reset: shoulder Y back near baseline AND elbow locked out
-        double yDrop = currentShoulderY - _baselineShoulderY;
-        double hipWidth = _baselineRuler;
-        double dropRatio = yDrop / hipWidth;
-        
-        bool shoulderUp = dropRatio <= 0.12;  // Must return to within 12% of start
-        bool elbowStraight = _currentAngle >= 165;  // Force real lockout (165 degrees)
-        
-        // FIX: Use AND - both must be true to complete rep
-        return shoulderUp && elbowStraight;
+        // Simple: Elbow angle only. 145 degrees = arms mostly straight
+        bool elbowStraight = _currentAngle >= 145;
+        return elbowStraight;
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
