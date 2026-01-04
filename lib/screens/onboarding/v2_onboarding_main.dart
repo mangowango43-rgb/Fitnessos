@@ -1725,7 +1725,19 @@ class _OnboardingScreenTemplate extends StatelessWidget {
           colors: AppColors.cyberGradient,
         ),
       ),
-      child: SafeArea(child: child),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height - 
+                        MediaQuery.of(context).padding.top - 
+                        MediaQuery.of(context).padding.bottom,
+            ),
+            child: child,
+          ),
+        ),
+      ),
     );
   }
 }
