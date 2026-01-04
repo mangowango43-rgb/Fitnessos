@@ -7,14 +7,28 @@ import 'tabs/workouts_tab.dart';
 import 'tabs/you_tab.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTab;
+  
+  const HomeScreen({super.key, this.initialTab = 0});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialTab;
+  }
+
+  void changeTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   final List<Widget> _tabs = const [
     HomeTab(),
@@ -33,12 +47,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return CyberGridBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: _tabs[_currentIndex],
-        ),
+      child: _TabNavigator(
+        changeTab: changeTab,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _tabs[_currentIndex],
+          ),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.95),
@@ -58,9 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return Expanded(
                     child: GestureDetector(
                       onTap: () {
-                        setState(() {
-                          _currentIndex = index;
-                        });
+                        changeTab(index);
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -126,5 +140,22 @@ class _TabInfo {
     required this.icon,
     required this.label,
   });
+}
+
+// InheritedWidget to allow child widgets to change tabs
+class _TabNavigator extends InheritedWidget {
+  final Function(int) changeTab;
+
+  const _TabNavigator({
+    required this.changeTab,
+    required super.child,
+  });
+
+  static _TabNavigator? of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<_TabNavigator>();
+  }
+
+  @override
+  bool updateShouldNotify(_TabNavigator old) => changeTab != old.changeTab;
 }
 
