@@ -238,6 +238,27 @@ class RepCounter {
       }
     }
     
+    // CURL/PULL: Track shoulder-to-wrist distance (wrist moves toward shoulder)
+    if (rule.pattern == MovementPattern.curl || rule.pattern == MovementPattern.pull) {
+      final lShoulder = map[PoseLandmarkType.leftShoulder];
+      final rShoulder = map[PoseLandmarkType.rightShoulder];
+      final lWrist = map[PoseLandmarkType.leftWrist];
+      final rWrist = map[PoseLandmarkType.rightWrist];
+      
+      if (lShoulder != null && lWrist != null) {
+        // Use 3D distance for curls (arm can be at any angle)
+        double leftDist = _dist3D(lShoulder, lWrist);
+        double rightDist = (rShoulder != null && rWrist != null) ? _dist3D(rShoulder, rWrist) : leftDist;
+        
+        // Use the SHORTER distance (the arm that's curling)
+        double currentDist = leftDist < rightDist ? leftDist : rightDist;
+        
+        if (_baselineTarget > 0.01) {
+          rawPercentage = (currentDist / _baselineTarget) * 100;
+        }
+      }
+    }
+    
     _smoothedPercentage = (_smoothingFactor * rawPercentage) + ((1 - _smoothingFactor) * _smoothedPercentage);
     _currentPercentage = _smoothedPercentage.clamp(0, 150);
     
@@ -412,10 +433,12 @@ class RepCounter {
         return _currentPercentage <= 90;  // Gap shrinks to 90% = down
         
       case MovementPattern.pull:
-        return _currentAngle <= rule.triggerAngle;
+        // Wrist gets closer to shoulder (like rows)
+        return _currentPercentage <= 70;  // Distance shrinks to 70%
         
       case MovementPattern.curl:
-        return _currentAngle <= rule.triggerAngle;
+        // Wrist gets closer to shoulder
+        return _currentPercentage <= 50;  // Distance shrinks to 50% (tight curl)
     }
   }
 
@@ -432,10 +455,12 @@ class RepCounter {
         return _currentPercentage >= 95;  // Back to 95% = up
         
       case MovementPattern.pull:
-        return _currentAngle >= rule.resetAngle;
+        // Wrist moves away from shoulder
+        return _currentPercentage >= 85;  // Distance back to 85%
         
       case MovementPattern.curl:
-        return _currentAngle >= rule.resetAngle;
+        // Wrist moves away from shoulder
+        return _currentPercentage >= 80;  // Distance back to 80%
     }
   }
 
