@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'utils/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding/v2_onboarding_main.dart';
+import 'screens/auth/sign_in_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +30,13 @@ class MyApp extends StatelessWidget {
       title: 'FitnessOS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const HomeScreen(),
+      // Start with onboarding for now (change to home once onboarding is seen)
+      initialRoute: '/onboarding',
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/onboarding': (context) => const V2OnboardingMain(),
+        '/signin': (context) => const SignInScreen(),
+      },
     );
   }
 }
