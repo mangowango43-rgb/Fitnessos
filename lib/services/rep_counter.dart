@@ -17,6 +17,8 @@ class ExerciseRule {
   final bool targetShrinks;
   final double triggerPercent;
   final double resetPercent;
+  final String cueGood;
+  final String cueBad;
 
   const ExerciseRule({
     required this.id,
@@ -26,8 +28,10 @@ class ExerciseRule {
     required this.rulerA,
     required this.rulerB,
     this.targetShrinks = true,
-    this.triggerPercent = 0.78, // Calibrated for "Front-on" forgiveness
+    this.triggerPercent = 0.78,
     this.resetPercent = 0.92,
+    this.cueGood = "Good!",
+    this.cueBad = "Deeper!",
   });
 }
 
@@ -51,7 +55,7 @@ class RepCounter {
   double get currentPercentage => _currentPercentage;
   RepState get state => _state;
 
-  // 3D DISTANCE: Fixes depth issues and high/low camera angles
+  /// 3D DISTANCE: Fixes depth issues and high/low camera angles
   double _dist3D(PoseLandmark a, PoseLandmark b) {
     return math.sqrt(
       math.pow(b.x - a.x, 2) + math.pow(b.y - a.y, 2) + math.pow(b.z - a.z, 2)
@@ -107,7 +111,7 @@ class RepCounter {
       case RepState.up:
         if (_currentPercentage <= trigger) {
           _state = RepState.down;
-          _feedback = "Good!";
+          _feedback = rule.cueGood;
         }
         return false;
       case RepState.down:
@@ -124,7 +128,7 @@ class RepCounter {
   _Points? _extractPoints(List<PoseLandmark> landmarks) {
     final map = {for (var lm in landmarks) lm.type: lm};
     
-    // PERSPECTIVE SWITCH: If facing front, use shoulder width as the stable ruler
+    // PERSPECTIVE SWITCH: If facing front, use shoulder width as stable ruler
     double lShVis = map[PoseLandmarkType.leftShoulder]?.likelihood ?? 0;
     double rShVis = map[PoseLandmarkType.rightShoulder]?.likelihood ?? 0;
     bool isFrontView = lShVis > 0.7 && rShVis > 0.7;
@@ -145,7 +149,9 @@ class RepCounter {
     return _Points(targetA: tA, targetB: tB, rulerA: rA, rulerB: rB);
   }
 
-  bool _isLowerBody(String id) => ['squats', 'lunges', 'leg_press'].any((e) => id.contains(e));
+  bool _isLowerBody(String id) {
+    return ['squats', 'lunges', 'leg_press', 'box_jumps', 'step_ups', 'jump', 'glute', 'hip_thrust', 'deadlift'].any((e) => id.contains(e));
+  }
 
   void reset() {
     _repCount = 0;
@@ -160,7 +166,7 @@ class _Points {
 }
 
 /// =============================================================================
-/// THE LIBRARY: ALL 120+ EXERCISES (COMPRESSED)
+/// THE LIBRARY: ALL 120+ EXERCISES
 /// =============================================================================
 
 class ExerciseRules {
@@ -178,50 +184,141 @@ class ExerciseRules {
   static const _rak = PoseLandmarkType.rightAnkle;
 
   static final Map<String, ExerciseRule> _rules = {
-    // LEGS (Trigger 0.78 = Parallel)
+    // LEGS
     ..._g(['squats', 'air_squats', 'sumo_squat', 'goblet_squats', 'front_squat', 'jump_squats', 'wall_sits', 'banded_squat', 'sumo_squat_pulse', 'box_jumps'], 
-        _hp, _ak, _sh, _hp, 0.78, 0.92, true),
+        _hp, _ak, _sh, _hp, 0.78, 0.92, true, "Depth!", "Hit parallel!"),
     ..._g(['lunges', 'walking_lunges', 'bulgarian_split_squat', 'step_ups', 'curtsy_lunges', 'jump_lunges'], 
-        _hp, _kn, _sh, _hp, 0.78, 0.92, true),
-    
-    // CHEST / PUSH (Trigger 0.75)
-    ..._g(['bench_press', 'incline_press', 'decline_press', 'pushups', 'wide_pushups', 'diamond_pushups', 'landmine_press', 'close_grip_push_ups', 'close_grip_bench', 'plank_to_pushup'], 
-        _sh, _wr, _sh, _hp, 0.75, 0.90, true),
+        _hp, _kn, _sh, _hp, 0.78, 0.92, true, "Great step!", "Deep lunge!"),
+    ..._g(['leg_press', 'leg_extensions', 'leg_curls', 'calf_raises'],
+        _hp, _ak, _sh, _hp, 0.78, 0.92, true, "Push!", "Full range!"),
 
-    // BACK / PULL (Trigger 0.70)
-    ..._g(['pull_ups', 'lat_pulldowns', 'bent_over_rows', 'cable_rows', 't_bar_rows', 'single_arm_db_row', 'renegade_rows', 'face_pulls'], 
-        _sh, _el, _sh, _rsh, 0.70, 0.90, true),
+    // CHEST
+    ..._g(['bench_press', 'incline_press', 'decline_press'], 
+        _sh, _wr, _sh, _rsh, 0.75, 0.90, true, "Good depth!", "Touch chest!"),
+    ..._g(['pushups', 'push_ups', 'wide_pushups', 'diamond_pushups', 'close_grip_push_ups'], 
+        _sh, _hp, _sh, _rsh, 0.75, 0.90, true, "Perfect!", "Go lower!"),
+    ..._g(['dips_chest', 'tricep_dips', 'tricep_dips_chair'],
+        _sh, _el, _sh, _rsh, 0.75, 0.90, true, "Nice dip!", "Get to 90!"),
+    ..._g(['chest_flys', 'cable_crossovers', 'dumbbell_flyes'],
+        _wr, _rwr, _sh, _rsh, 0.75, 0.90, true, "Squeeze!", "Together!"),
 
-    // ARMS (Trigger 0.65)
-    ..._g(['bicep_curls', 'hammer_curls', 'preacher_curls', 'concentration_curls', 'cable_curls', 'barbell_curl', 'skull_crushers'], 
-        _sh, _wr, _sh, _el, 0.65, 0.88, true),
+    // BACK
+    ..._g(['pull_ups', 'pullups', 'lat_pulldowns', 'lat_pulldown'], 
+        _sh, _el, _sh, _rsh, 0.70, 0.90, true, "Chin over!", "Full stretch!"),
+    ..._g(['bent_over_rows', 'cable_rows', 't_bar_rows', 'single_arm_db_row', 'renegade_rows'], 
+        _sh, _wr, _sh, _hp, 0.70, 0.90, true, "Nice pull!", "Squeeze lats!"),
+    ..._g(['face_pulls', 'reverse_flys'],
+        _el, _rel, _sh, _rsh, 0.70, 0.90, false, "Great!", "Pull wide!"),
+    ..._g(['shrugs'],
+        _sh, _hp, _hp, _kn, 0.92, 0.97, true, "High!", "Full shrug!"),
+
+    // SHOULDERS
+    ..._g(['overhead_press', 'shoulder_press', 'arnold_press', 'seated_db_press'],
+        _sh, _wr, _sh, _hp, 0.75, 0.90, false, "Sky high!", "Lock out!"),
+    ..._g(['lateral_raises', 'front_raises', 'cable_lateral_raise'],
+        _wr, _hp, _sh, _hp, 0.75, 0.90, false, "Perfect!", "To shoulders!"),
+    ..._g(['rear_delt_flys', 'upright_rows'],
+        _el, _hp, _sh, _hp, 0.75, 0.90, true, "Wide!", "Pull higher!"),
+    ..._g(['pike_push_ups', 'plank_shoulder_taps'],
+        _sh, _wr, _sh, _hp, 0.75, 0.90, true, "Strong!", "Control!"),
+
+    // ARMS
+    ..._g(['bicep_curls', 'hammer_curls', 'preacher_curls', 'concentration_curls', 'cable_curls', 'barbell_curl'], 
+        _sh, _wr, _sh, _el, 0.65, 0.88, true, "Full curl!", "No swinging!"),
+    ..._g(['skull_crushers'],
+        _el, _wr, _sh, _el, 0.65, 0.88, true, "Perfect!", "To forehead!"),
     ..._g(['tricep_extensions', 'overhead_tricep', 'tricep_pushdown'], 
-        _el, _wr, _sh, _el, 0.75, 0.90, false),
+        _el, _wr, _sh, _el, 0.75, 0.90, false, "Strong!", "Full extend!"),
 
-    // HINGE (Trigger 0.82)
-    ..._g(['deadlift', 'sumo_deadlift', 'romanian_deadlift', 'single_leg_deadlift', 'cable_pullthrough', 'kettlebell_swings'], 
-        _sh, _hp, _hp, _kn, 0.82, 0.94, false),
+    // HINGE
+    ..._g(['deadlift', 'sumo_deadlift'], 
+        _sh, _ak, _sh, _hp, 0.82, 0.94, false, "Lockout!", "Hips forward!"),
+    ..._g(['romanian_deadlift', 'single_leg_deadlift', 'cable_pullthrough'], 
+        _sh, _hp, _hp, _kn, 0.82, 0.94, false, "Hamstrings!", "Flat back!"),
+    ..._g(['kettlebell_swings'],
+        _wr, _hp, _sh, _hp, 0.82, 0.94, false, "Swing!", "Hips drive!"),
 
-    // CORE (Trigger 0.75)
-    ..._g(['sit_ups', 'crunches', 'leg_raises', 'mountain_climbers', 'bicycle_crunches', 'hanging_leg_raise', 'decline_sit_up', 'cable_crunch', 'russian_twists', 'plank_shoulder_taps'], 
-        _sh, _hp, _hp, _kn, 0.75, 0.92, true),
+    // CORE
+    ..._g(['sit_ups', 'situps', 'crunches', 'decline_sit_up', 'cable_crunch'], 
+        _sh, _hp, _hp, _kn, 0.75, 0.92, true, "Core strong!", "Squeeze abs!"),
+    ..._g(['leg_raises', 'hanging_leg_raise'],
+        _hp, _ak, _sh, _hp, 0.75, 0.92, true, "Legs high!", "Lower slow!"),
+    ..._g(['mountain_climbers', 'bicycle_crunches'],
+        _kn, _sh, _sh, _hp, 0.75, 0.92, true, "Fast feet!", "Knees to chest!"),
+    ..._g(['russian_twists', 'woodchoppers'],
+        _wr, _hp, _sh, _hp, 0.75, 0.92, false, "Twist!", "Rotate!"),
+    ..._g(['plank', 'plank_hold', 'side_plank'],
+        _sh, _ak, _sh, _hp, 0.95, 0.98, false, "Flat back!", "Don't sag!"),
+    ..._g(['dead_bug', 'superman_raises', 'superman'],
+        _wr, _ak, _sh, _hp, 0.75, 0.92, false, "Slow!", "Arms up!"),
 
     // CARDIO
-    ..._g(['burpees', 'jumping_jacks', 'high_knees', 'butt_kicks', 'jump_rope', 'sprawls', 'tuck_jumps', 'star_jumps', 'plank_jacks', 'skaters', 'lateral_hops', 'mountain_climbers'], 
-        _sh, _ak, _sh, _hp, 0.70, 0.92, true),
+    ..._g(['burpees', 'sprawls'], 
+        _sh, _ak, _sh, _hp, 0.70, 0.92, true, "Explode!", "Full extension!"),
+    ..._g(['jumping_jacks', 'star_jumps'],
+        _wr, _rwr, _sh, _rsh, 0.70, 0.92, false, "Jump!", "Arms high!"),
+    ..._g(['high_knees', 'butt_kicks', 'tuck_jumps'],
+        _kn, _hp, _sh, _hp, 0.70, 0.92, true, "Knees up!", "Higher!"),
+    ..._g(['jump_rope', 'skaters', 'lateral_hops'],
+        _ak, _rak, _hp, _rhp, 0.70, 0.92, false, "Bounce!", "Light feet!"),
+    ..._g(['plank_jacks'],
+        _ak, _rak, _sh, _rsh, 0.70, 0.92, false, "Jump!", "Feet wide!"),
+    ..._g(['bear_crawls'],
+        _sh, _hp, _hp, _kn, 0.85, 0.95, true, "Crawl!", "Low hips!"),
 
     // HOME BOOTY
-    ..._g(['donkey_kicks', 'fire_hydrants', 'clamshells', 'frog_pumps', 'glute_bridge', 'hip_thrust', 'glute_bridge_hold'], 
-        _hp, _kn, _sh, _hp, 0.78, 0.92, true),
+    ..._g(['glute_bridge', 'single_leg_glute_bridge', 'hip_thrust', 'glute_bridge_hold', 'banded_glute_bridge'], 
+        _sh, _kn, _hp, _kn, 0.78, 0.92, false, "Squeeze!", "Hips up!"),
+    ..._g(['donkey_kicks', 'donkey_kick_pulses', 'banded_kickback'],
+        _kn, _ak, _hp, _kn, 0.78, 0.92, false, "Kick!", "Squeeze glute!"),
+    ..._g(['fire_hydrants', 'banded_fire_hydrant'],
+        _kn, _hp, _sh, _hp, 0.78, 0.92, false, "Lift!", "Open hip!"),
+    ..._g(['clamshells', 'banded_clamshell'],
+        _kn, _rkn, _hp, _rhp, 0.78, 0.92, false, "Open!", "Keep feet together!"),
+    ..._g(['frog_pumps'],
+        _sh, _kn, _hp, _kn, 0.78, 0.92, false, "Pump!", "Hips up!"),
+    ..._g(['squat_to_kickback'],
+        _hp, _ak, _sh, _hp, 0.78, 0.92, true, "Kick!", "Full squat!"),
+    ..._g(['banded_lateral_walk'],
+        _ak, _rak, _hp, _rhp, 0.78, 0.92, false, "Step!", "Stay low!"),
 
     // STRETCHING
-    ..._g(['cat_cow', 'worlds_greatest_stretch', 'pigeon_pose', 'hamstring_stretch', 'quad_stretch', 'childs_pose', 'hip_flexor_stretch', 'butterfly_stretch', 'happy_baby', 'frog_stretch', '90_90_stretch'], 
-        _sh, _hp, _hp, _kn, 0.70, 0.90, true),
+    ..._g(['cat_cow'],
+        _sh, _hp, _hp, _kn, 0.70, 0.90, false, "Flow!", "Arch back!"),
+    ..._g(['worlds_greatest_stretch'],
+        _sh, _kn, _hp, _kn, 0.70, 0.90, true, "Deep!", "Rotate!"),
+    ..._g(['pigeon_pose', '90_90_stretch'],
+        _sh, _hp, _hp, _kn, 0.85, 0.95, true, "Hold!", "Square hips!"),
+    ..._g(['hamstring_stretch'],
+        _sh, _ak, _sh, _hp, 0.70, 0.90, true, "Feel it!", "Reach!"),
+    ..._g(['quad_stretch'],
+        _ak, _hp, _hp, _kn, 0.70, 0.90, true, "Pull!", "Leg behind!"),
+    ..._g(['childs_pose'],
+        _sh, _kn, _hp, _kn, 0.70, 0.90, true, "Breathe!", "Sit back!"),
+    ..._g(['hip_flexor_stretch'],
+        _sh, _kn, _hp, _kn, 0.70, 0.90, true, "Push!", "Lunge forward!"),
+    ..._g(['butterfly_stretch', 'frog_stretch'],
+        _kn, _rkn, _hp, _rhp, 0.70, 0.90, false, "Relax!", "Knees wide!"),
+    ..._g(['happy_baby'],
+        _ak, _sh, _hp, _kn, 0.70, 0.90, true, "Relax!", "Knees wide!"),
+    ..._g(['chest_doorway_stretch'],
+        _wr, _sh, _sh, _hp, 0.70, 0.90, false, "Open!", "Lean in!"),
   };
 
-  static Map<String, ExerciseRule> _g(List<String> ids, PoseLandmarkType tA, PoseLandmarkType tB, PoseLandmarkType rA, PoseLandmarkType rB, double trig, double res, bool s) {
-    return {for (var id in ids) id: ExerciseRule(id: id, name: id.replaceAll('_', ' ').toUpperCase(), targetA: tA, targetB: tB, rulerA: rA, rulerB: rB, targetShrinks: s, triggerPercent: trig, resetPercent: res)};
+  static Map<String, ExerciseRule> _g(List<String> ids, PoseLandmarkType tA, PoseLandmarkType tB, PoseLandmarkType rA, PoseLandmarkType rB, double trig, double res, bool shrinks, String good, String bad) {
+    return {for (var id in ids) id: ExerciseRule(id: id, name: _formatName(id), targetA: tA, targetB: tB, rulerA: rA, rulerB: rB, targetShrinks: shrinks, triggerPercent: trig, resetPercent: res, cueGood: good, cueBad: bad)};
   }
 
-  static ExerciseRule? getRule(String id) => _rules[id.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_')];
+  static String _formatName(String id) {
+    return id.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+  }
+
+  static ExerciseRule? getRule(String id) {
+    final normalized = id.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
+    return _rules[normalized];
+  }
+
+  static bool hasRule(String id) => getRule(id) != null;
+  static int get exerciseCount => _rules.length;
+  static List<String> get allIds => _rules.keys.toList();
 }
