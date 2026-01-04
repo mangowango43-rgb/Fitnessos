@@ -261,16 +261,17 @@ class RepCounter {
         
       case MovementPattern.push:
         // PUSH-UP FIX: Track shoulder Y moving DOWN (Y increases as you go down in screen coords)
-        // Shoulder Y increases by 15%+ of hip width = you went down
+        // Shoulder Y increases by 35%+ of hip width = you went down
         double yDrop = currentShoulderY - _baselineShoulderY;
         double hipWidth = _baselineRuler;
         double dropRatio = yDrop / hipWidth;
         
         // Also check elbow angle as backup
-        bool shoulderDropped = dropRatio >= 0.40;  // Shoulder dropped 40% of hip width = real push-up
+        bool shoulderDropped = dropRatio >= 0.35;  // Shoulder dropped 35% of hip width
         bool elbowBent = _currentAngle <= rule.triggerAngle;
         
-        return shoulderDropped || elbowBent;
+        // FIX: Use AND - both must be true to trigger
+        return shoulderDropped && elbowBent;
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -289,15 +290,16 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // Reset: shoulder Y back near baseline
+        // Reset: shoulder Y back near baseline AND elbow locked out
         double yDrop = currentShoulderY - _baselineShoulderY;
         double hipWidth = _baselineRuler;
         double dropRatio = yDrop / hipWidth;
         
-        bool shoulderUp = dropRatio <= 0.15;  // Shoulder within 15% of start = back up
-        bool elbowStraight = _currentAngle >= rule.resetAngle;
+        bool shoulderUp = dropRatio <= 0.12;  // Must return to within 12% of start
+        bool elbowStraight = _currentAngle >= 165;  // Force real lockout (165 degrees)
         
-        return shoulderUp || elbowStraight;
+        // FIX: Use AND - both must be true to complete rep
+        return shoulderUp && elbowStraight;
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
