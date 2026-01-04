@@ -294,15 +294,9 @@ class RepCounter {
         if (isDown) {
           _intentTimer ??= DateTime.now();
           if (DateTime.now().difference(_intentTimer!).inMilliseconds > _intentDelayMs) {
-            // ANTI-RAPID-FIRE: Must wait 500ms between reps
-            if (DateTime.now().difference(_lastRepTime).inMilliseconds > 500) {
-              _state = RepState.down;
-              _repCount++;  // COUNT REP WHEN HITTING BOTTOM
-              _lastRepTime = DateTime.now();
-              _feedback = rule.cueGood;
-              _intentTimer = null;
-              return true;  // REP COUNTED HERE
-            }
+            _state = RepState.down;
+            _feedback = rule.cueGood;
+            _intentTimer = null;
           }
         } else {
           // Moved back up before confirming
@@ -313,14 +307,20 @@ class RepCounter {
 
       case RepState.down:
         if (isReset) {
-          _state = RepState.up;  // Just go back to up, rep already counted
+          _state = RepState.goingUp;
         }
         return false;
         
       case RepState.goingUp:
         if (isReset) {
-          _state = RepState.up;
-          _feedback = "";
+          // ANTI-RAPID-FIRE: Must wait 500ms between reps
+          if (DateTime.now().difference(_lastRepTime).inMilliseconds > 500) {
+            _state = RepState.up;
+            _repCount++;  // COUNT REP WHEN BACK UP
+            _lastRepTime = DateTime.now();
+            _feedback = "";
+            return true;  // REP COUNTED
+          }
         } else {
           // Went back down
           _state = RepState.down;
@@ -340,14 +340,10 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // NOSE DROP: When nose drops to 30% or less of baseline difference from wrists
-        // At start: nose is above wrists (baseline diff is positive, e.g. 100)
-        // At bottom: nose is near wrists (diff shrinks to ~30 or less)
-        if (_baselineNoseWristDiff > 0.01) {
-          double dropRatio = _currentNoseWristDiff / _baselineNoseWristDiff;
-          return dropRatio <= 0.35;  // Nose dropped 65% of the way toward wrists
-        }
-        return false;
+        // SHOULDER WIDTH: From front, shoulders get WIDER as you go down
+        // Track shoulder-to-shoulder distance increasing
+        // currentPercentage > 100 means wider than baseline
+        return _currentPercentage >= 115;  // Shoulders 15% wider = you're down
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -366,12 +362,8 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // NOSE RESET: When nose goes back up to 70%+ of baseline difference
-        if (_baselineNoseWristDiff > 0.01) {
-          double dropRatio = _currentNoseWristDiff / _baselineNoseWristDiff;
-          return dropRatio >= 0.70;  // Nose back up to 70% of starting height
-        }
-        return true;
+        // SHOULDER WIDTH: Back to near baseline = you're back up
+        return _currentPercentage <= 105;  // Shoulders within 5% of baseline = back up
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
@@ -579,8 +571,8 @@ class ExerciseRules {
         id: id,
         name: _formatName(id),
         pattern: MovementPattern.push,
-        targetA: _sh,
-        targetB: _wr,
+        targetA: _sh,    // Left shoulder
+        targetB: _rsh,   // Right shoulder - tracking WIDTH
         jointA: _sh,
         jointVertex: _el,
         jointB: _wr,
