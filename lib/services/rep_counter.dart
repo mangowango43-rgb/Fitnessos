@@ -267,7 +267,7 @@ class RepCounter {
         double dropRatio = yDrop / hipWidth;
         
         // Also check elbow angle as backup
-        bool shoulderDropped = dropRatio >= 0.20;  // Shoulder dropped 20% of hip width
+        bool shoulderDropped = dropRatio >= 0.40;  // Shoulder dropped 40% of hip width = real push-up
         bool elbowBent = _currentAngle <= rule.triggerAngle;
         
         return shoulderDropped || elbowBent;
@@ -294,7 +294,7 @@ class RepCounter {
         double hipWidth = _baselineRuler;
         double dropRatio = yDrop / hipWidth;
         
-        bool shoulderUp = dropRatio <= 0.08;  // Shoulder within 8% of start
+        bool shoulderUp = dropRatio <= 0.15;  // Shoulder within 15% of start = back up
         bool elbowStraight = _currentAngle >= rule.resetAngle;
         
         return shoulderUp || elbowStraight;
