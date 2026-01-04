@@ -381,9 +381,9 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // ELBOW ANGLE: Now tracking BOTH arms, using the more bent one
-        // When arm bends to 90 degrees or less = you're down
-        return _currentAngle <= 110;
+        // SIMPLE: Shoulder-to-wrist distance SHRINKS when you go down
+        // Same logic as squat - just proportion
+        return _currentPercentage <= 75;  // Arms at 75% of starting length = down
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -402,8 +402,8 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // ELBOW ANGLE: Arms straighten back out
-        return _currentAngle >= 150;
+        // Arms extend back out
+        return _currentPercentage >= 90;  // Arms back to 90% of starting length = up
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
@@ -612,7 +612,7 @@ class ExerciseRules {
         name: _formatName(id),
         pattern: MovementPattern.push,
         targetA: _sh,    // Left shoulder
-        targetB: _rsh,   // Right shoulder - tracking WIDTH
+        targetB: _wr,    // Left wrist - tracking ARM LENGTH
         jointA: _sh,
         jointVertex: _el,
         jointB: _wr,
