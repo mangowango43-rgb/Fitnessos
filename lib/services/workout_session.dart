@@ -1,17 +1,18 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'rep_counter.dart';
+import '../core/patterns/movement_engine.dart';
+import '../core/patterns/base_pattern.dart';
 import 'voice_coach.dart';
 import '../models/rep_quality.dart';
 
 // Export RepState and RepCounter for UI access
-export 'rep_counter.dart' show RepState, RepCounter, ExerciseRule, ExerciseRules;
+export '../core/patterns/base_pattern.dart' show RepState;
 
 /// Manages the active workout session
 /// Connects: Pose Detection → Rep Counter → Voice Coach
 class WorkoutSession {
   final VoiceCoach _voice = VoiceCoach();
-  RepCounter? _counter;
-  ExerciseRule? _currentExercise;
+  MovementEngine _engine = MovementEngine();
+  String _currentExerciseId = '';
   bool _baselineCaptured = false;
 
   // Current state
@@ -41,15 +42,15 @@ class WorkoutSession {
   // Getters
   bool get isActive => _isActive;
   bool get isResting => _isResting;
-  int get currentReps => _counter?.repCount ?? 0;
+  int get currentReps => _engine.repCount ?? 0;
   int get currentSet => _currentSetIndex + 1;
   int get targetReps => _targetReps;
   int get targetSets => _targetSets;
-  double get currentAngle => _counter?.currentPercentage ?? 0;
-  double get formScore => _counter?.currentPercentage ?? 0;
-  String get feedback => _counter?.feedback ?? '';
-  String get exerciseName => _currentExercise?.name ?? '';
-  String get phase => _counter?.state.name ?? '';
+  double get currentAngle => (_engine.chargeProgress * 100) ?? 0;
+  double get formScore => (_engine.chargeProgress * 100) ?? 0;
+  String get feedback => _engine.feedback ?? '';
+  String get exerciseName => _currentExerciseId;
+  String get phase => _engine.state.name ?? '';
 
   // GAMING: Combo getters
   int get currentCombo => _currentCombo;
@@ -64,11 +65,11 @@ class WorkoutSession {
   // chargeProgress should go 0 -> 1 as you squat down
   // So: (100 - percentage) / 30 gives us 0->1 range for 100->70
   double get chargeProgress {
-    final pct = _counter?.currentPercentage ?? 100;
+    final pct = (_engine.chargeProgress * 100) ?? 100;
     // Map 100->70 to 0->1 (clamped)
     return ((100 - pct) / 30).clamp(0.0, 1.0);
   }
-  RepState? get repState => _counter?.state;
+  RepState? get repState => _engine.state;
   
   /// Initialize the session
   Future<void> init() async {
@@ -76,20 +77,19 @@ class WorkoutSession {
   }
   
   /// Start tracking an exercise
-  Future<void> startExercise({
+    Future<void> startExercise({
     required String exerciseId,
     required int sets,
     required int reps,
   }) async {
-    final rule = ExerciseRules.getRule(exerciseId);
-    
-    if (rule == null) {
-      print('⚠️ No tracking rule for: $exerciseId');
+    // Load the pattern for this exercise
+    if (!MovementEngine.hasPattern(exerciseId)) {
+      print('⚠️ No tracking pattern for: $exerciseId');
       return;
     }
 
-    _currentExercise = rule;
-    _counter = RepCounter(rule);
+    _currentExerciseId = exerciseId;
+    _engine.loadExercise(exerciseId);
     _baselineCaptured = false;
     _targetSets = sets;
     _targetReps = reps;
@@ -107,36 +107,36 @@ class WorkoutSession {
     _repHistory = [];
     _setStartTime = DateTime.now();
 
-    await _voice.announceExercise(rule.name, sets, reps);
+    await _voice.announceExercise(exerciseId, sets, reps);
   }
   
   /// Process pose landmarks from camera
   /// Call this every frame with the detected landmarks
   void processPose(List<PoseLandmark> landmarks) {
-    if (!_isActive || _isResting || _counter == null) return;
+    if (!_isActive || _isResting || _engine == null) return;
 
     // Capture baseline on first frame to lock on to user
     if (!_baselineCaptured) {
-      _counter!.captureBaseline(landmarks);
+      _engine.captureBaseline(landmarks);
       _baselineCaptured = true;
       return; // Don't process first frame
     }
 
-    bool repCompleted = _counter!.processFrame(landmarks);
+    bool repCompleted = _engine.processFrame(landmarks);
 
     if (repCompleted) {
       _onRepCompleted();
     }
 
     // Send feedback if changed
-    if (_counter!.feedback.isNotEmpty) {
-      onFeedback?.call(_counter!.feedback);
+    if (_engine.feedback.isNotEmpty) {
+      onFeedback?.call(_engine.feedback);
     }
   }
   
   void _onRepCompleted() {
-    final reps = _counter!.repCount;
-    final score = _counter!.currentPercentage;
+    final reps = _engine.repCount;
+    final score = (_engine.chargeProgress * 100);
 
     // GAMING: Classify rep quality
     final quality = classifyRep(score);
@@ -172,7 +172,7 @@ class WorkoutSession {
     _repHistory.add(RepData(
       quality: quality,
       formScore: score,
-      angle: _counter!.currentPercentage,
+      angle: (_engine.chargeProgress * 100),
       timestamp: DateTime.now(),
     ));
 
@@ -213,7 +213,7 @@ class WorkoutSession {
     if (!_isResting) return;
 
     _isResting = false;
-    _counter?.reset();
+    _engine.reset();
     _baselineCaptured = false;
     _voice.speakNow('Set ${_currentSetIndex + 1}. Go!');
   }
@@ -225,7 +225,7 @@ class WorkoutSession {
   
   /// Reset the current exercise (start over)
   void resetExercise() {
-    _counter?.reset();
+    _engine.reset();
     _baselineCaptured = false;
     _currentSetIndex = 0;
     _isResting = false;
@@ -235,8 +235,8 @@ class WorkoutSession {
   void stop() {
     _isActive = false;
     _isResting = false;
-    _counter = null;
-    _currentExercise = null;
+    _engine.reset();
+    _currentExerciseId = '';
   }
   
   Future<void> dispose() async {

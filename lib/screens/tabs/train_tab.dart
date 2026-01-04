@@ -21,6 +21,7 @@ import '../../providers/workout_provider.dart';
 
 // NEW: Import the rep counting system
 import '../../services/workout_session.dart';
+import '../../core/patterns/movement_engine.dart';
 
 class TrainTab extends ConsumerStatefulWidget {
   const TrainTab({super.key});
@@ -422,7 +423,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     final exercise = _lockedWorkout!.exercises[_currentExerciseIndex];
     
     // Check if we have a tracking rule for this exercise
-    if (ExerciseRules.hasRule(exercise.id)) {
+    if (MovementEngine.hasPattern(exercise.id)) {
       _session?.startExercise(
         exerciseId: exercise.id,
         sets: exercise.sets,
@@ -775,7 +776,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                         ),
                         const SizedBox(height: 8),
                         ..._lockedWorkout!.exercises.map((e) {
-                          final hasTracking = ExerciseRules.hasRule(e.id);
+                          final hasTracking = MovementEngine.hasPattern(e.id);
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Row(
