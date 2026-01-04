@@ -1,17 +1,6 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'dart:math' as math;
 
-/// =============================================================================
-/// THE UNICORN ENGINE - FIXED REFERENCES
-/// =============================================================================
-/// 
-/// FIXES:
-/// 1. Squat ruler = HIP-TO-HIP width (not shoulders - shoulders move with barbell)
-/// 2. Push-up = Track SHOULDER Y-POSITION dropping (vertical movement visible from any angle)
-/// 3. Deadlift = Hip angle (already working)
-/// 4. CURL = Wrist Y position traveling from hip to shoulder
-/// =============================================================================
-
 enum RepState { ready, goingDown, down, goingUp, up }
 
 enum MovementPattern { squat, hinge, push, pull, curl }
@@ -21,13 +10,11 @@ class ExerciseRule {
   final String name;
   final MovementPattern pattern;
   
-  // For PROPORTION tracking
   final PoseLandmarkType targetA;
   final PoseLandmarkType targetB;
   final double triggerPercent;
   final double resetPercent;
   
-  // For ANGLE tracking
   final PoseLandmarkType? jointA;
   final PoseLandmarkType? jointVertex;
   final PoseLandmarkType? jointB;
@@ -65,7 +52,7 @@ class RepCounter {
   // Baseline values
   double _baselineTarget = 0;
   double _baselineRuler = 0;
-  double _baselineShoulderY = 0;  // For push-ups: starting shoulder height
+  double _baselineShoulderY = 0;
   
   // Current values
   double _currentPercentage = 100;
@@ -73,9 +60,9 @@ class RepCounter {
   double _smoothedPercentage = 100;
   double _smoothedAngle = 180;
   double _smoothedShoulderY = 0;
-  double _contractionRatio = 2.0;  // For push-ups: arm length / upper arm length
+  double _contractionRatio = 2.0;
   
-  // CURL: Track wrist journey from hip to shoulder (0% = at hip, 100% = at shoulder)
+  // CURL: Track wrist Y journey from hip to shoulder (0% = at hip, 100% = at shoulder)
   double _curlProgress = 0;
   double _smoothedCurlProgress = 0;
   
@@ -89,6 +76,7 @@ class RepCounter {
   DateTime? _intentTimer;
   DateTime _lastRepTime = DateTime.now();
   static const int _intentDelayMs = 250;
+  static const int _minTimeBetweenRepsMs = 800;  // INCREASED from 500ms to 800ms
   
   RepCounter(this.rule);
   
@@ -98,10 +86,13 @@ class RepCounter {
   double get currentPercentage => _currentPercentage;
   RepState get state => _state;
   
+  /// Charge progress for power gauge (0.0 to 1.0)
   double get chargeProgress {
+    // CURL: Use curl progress directly
     if (rule.pattern == MovementPattern.curl) {
-      return (_curlProgress / 100).clamp(0.0, 1.0);
+      return (_curlProgress / 100.0).clamp(0.0, 1.0);
     }
+    // Others: Convert percentage to 0-1 range
     double trigger = rule.triggerPercent * 100;
     double progress = (100 - _currentPercentage) / (100 - trigger);
     return progress.clamp(0.0, 1.0);
@@ -142,6 +133,7 @@ class RepCounter {
     
     _baselineTarget = _dist3D(tA, tB);
     
+    // HIP-TO-HIP RULER
     final lHip = map[PoseLandmarkType.leftHip];
     final rHip = map[PoseLandmarkType.rightHip];
     
@@ -151,6 +143,7 @@ class RepCounter {
       _baselineRuler = _baselineTarget;
     }
     
+    // For PUSH pattern: capture shoulder Y position
     final lSh = map[PoseLandmarkType.leftShoulder];
     final rSh = map[PoseLandmarkType.rightShoulder];
     if (lSh != null && rSh != null) {
@@ -158,6 +151,7 @@ class RepCounter {
       _smoothedShoulderY = _baselineShoulderY;
     }
     
+    // PUSH-UP: Store Y-distance between shoulders and wrists
     final lWr = map[PoseLandmarkType.leftWrist];
     final rWr = map[PoseLandmarkType.rightWrist];
     if (rule.pattern == MovementPattern.push && lSh != null && rSh != null && lWr != null && rWr != null) {
@@ -166,6 +160,7 @@ class RepCounter {
       _baselineTarget = (wristY - shoulderY).abs();
     }
     
+    // PUSH-UP: Capture nose to wrist Y difference
     final nose = map[PoseLandmarkType.nose];
     if (nose != null && lWr != null && rWr != null) {
       double avgWristY = (lWr.y + rWr.y) / 2;
@@ -181,6 +176,7 @@ class RepCounter {
     _smoothedPercentage = 100;
     _smoothedAngle = 180;
     _smoothedCurlProgress = 0;
+    _curlProgress = 0;
     _baselineCaptured = true;
     _state = RepState.ready;
     _feedback = "LOCKED";
@@ -202,8 +198,10 @@ class RepCounter {
       return false;
     }
     
+    // Calculate current distance
     double currentTarget = _dist3D(tA, tB);
     
+    // HIP-TO-HIP ruler
     double currentRuler = _baselineRuler;
     final lHip = map[PoseLandmarkType.leftHip];
     final rHip = map[PoseLandmarkType.rightHip];
@@ -213,11 +211,12 @@ class RepCounter {
     
     if (currentRuler < 0.01) currentRuler = _baselineRuler;
     
+    // Proportion calculation
     double baselineRatio = _baselineTarget / _baselineRuler;
     double currentRatio = currentTarget / currentRuler;
     double rawPercentage = (currentRatio / baselineRatio) * 100;
     
-    // PUSH-UP: Y-distance
+    // PUSH-UP SPECIAL: Use Y-distance only
     if (rule.pattern == MovementPattern.push) {
       final lShoulder = map[PoseLandmarkType.leftShoulder];
       final rShoulder = map[PoseLandmarkType.rightShoulder];
@@ -250,11 +249,14 @@ class RepCounter {
         double hipY = (lHip.y + rHip.y) / 2;
         double wristY = (lWrist.y + rWrist.y) / 2;
         
+        // Total range from shoulder to hip
         double totalRange = hipY - shoulderY;
+        // How far wrist is from shoulder
         double wristFromShoulder = wristY - shoulderY;
         
         double rawCurlProgress = 0;
         if (totalRange > 0.01) {
+          // 0% = at hip, 100% = at shoulder
           rawCurlProgress = ((totalRange - wristFromShoulder) / totalRange) * 100;
         }
         
@@ -263,7 +265,7 @@ class RepCounter {
       }
     }
     
-    // Angle calculation
+    // Angle calculation (for hinge/pull/curl)
     double rawAngle = 180;
     if (rule.jointA != null && rule.jointVertex != null && rule.jointB != null) {
       final jA = map[rule.jointA];
@@ -275,7 +277,7 @@ class RepCounter {
       }
     }
     
-    // PUSH-UP: Track BOTH arms
+    // PUSH-UP: Track BOTH arms and use the better one
     if (rule.pattern == MovementPattern.push) {
       final lShoulder = map[PoseLandmarkType.leftShoulder];
       final lElbow = map[PoseLandmarkType.leftElbow];
@@ -307,6 +309,7 @@ class RepCounter {
     _smoothedAngle = (_smoothingFactor * rawAngle) + ((1 - _smoothingFactor) * _smoothedAngle);
     _currentAngle = _smoothedAngle;
     
+    // Shoulder Y tracking
     final lSh = map[PoseLandmarkType.leftShoulder];
     final rSh = map[PoseLandmarkType.rightShoulder];
     double currentShoulderY = _baselineShoulderY;
@@ -316,6 +319,7 @@ class RepCounter {
       currentShoulderY = _smoothedShoulderY;
     }
     
+    // Contraction ratio
     final lEl = map[PoseLandmarkType.leftElbow];
     final lWr = map[PoseLandmarkType.leftWrist];
     final rWr = map[PoseLandmarkType.rightWrist];
@@ -328,6 +332,7 @@ class RepCounter {
       }
     }
     
+    // Nose tracking
     final nose = map[PoseLandmarkType.nose];
     if (nose != null && lWr != null && rWr != null) {
       double avgWristY = (lWr.y + rWr.y) / 2;
@@ -336,6 +341,7 @@ class RepCounter {
       _currentNoseWristDiff = _smoothedNoseWristDiff;
     }
     
+    // Check down/reset based on pattern
     bool isDown = _checkIsDown(currentShoulderY);
     bool isReset = _checkIsReset(currentShoulderY);
     
@@ -384,7 +390,8 @@ class RepCounter {
         
       case RepState.goingUp:
         if (isReset) {
-          if (DateTime.now().difference(_lastRepTime).inMilliseconds > 500) {
+          // ANTI-RAPID-FIRE: Must wait 800ms between reps
+          if (DateTime.now().difference(_lastRepTime).inMilliseconds > _minTimeBetweenRepsMs) {
             _state = RepState.up;
             _repCount++;
             _lastRepTime = DateTime.now();
@@ -413,7 +420,7 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.curl:
-        // Wrist at 70%+ of way to shoulder = curl done
+        // CURL: Wrist at 70%+ of way from hip to shoulder
         return _curlProgress >= 70;
     }
   }
@@ -433,7 +440,7 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.curl:
-        // Wrist dropped back below 30% = arm down
+        // CURL: Wrist dropped back below 30%
         return _curlProgress <= 30;
     }
   }
@@ -447,7 +454,7 @@ class RepCounter {
 }
 
 /// =============================================================================
-/// EXERCISE LIBRARY
+/// EXERCISE LIBRARY - UNCHANGED
 /// =============================================================================
 
 class ExerciseRules {
@@ -520,7 +527,7 @@ class ExerciseRules {
     ..._pull(['face_pulls', 'reverse_flys'],
         85, 150, "Back!", "Pull wide!"),
 
-    // CURL PATTERN - Wrist Y from hip to shoulder
+    // CURL PATTERN
     ..._curl(['bicep_curls', 'hammer_curls', 'barbell_curl', 'ez_bar_curl'], 
         50, 145, "Full curl!", "Squeeze!"),
     ..._curl(['preacher_curls', 'concentration_curls', 'cable_curls', 'incline_curls'], 
