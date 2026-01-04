@@ -74,6 +74,11 @@ class RepCounter {
   double _smoothedShoulderY = 0;
   double _contractionRatio = 2.0;  // For push-ups: arm length / upper arm length
   
+  // PUSH-UP: Nose drop tracking
+  double _baselineNoseWristDiff = 0;  // Starting difference between nose Y and wrist Y
+  double _currentNoseWristDiff = 0;   // Current difference
+  double _smoothedNoseWristDiff = 0;
+  
   // Anti-ghost
   static const double _smoothingFactor = 0.3;
   DateTime? _intentTimer;
@@ -149,6 +154,16 @@ class RepCounter {
     if (lSh != null && rSh != null) {
       _baselineShoulderY = (lSh.y + rSh.y) / 2;  // Average shoulder Y
       _smoothedShoulderY = _baselineShoulderY;
+    }
+    
+    // PUSH-UP: Capture nose to wrist Y difference (nose should be above wrists at start)
+    final nose = map[PoseLandmarkType.nose];
+    final lWr = map[PoseLandmarkType.leftWrist];
+    final rWr = map[PoseLandmarkType.rightWrist];
+    if (nose != null && lWr != null && rWr != null) {
+      double avgWristY = (lWr.y + rWr.y) / 2;
+      _baselineNoseWristDiff = avgWristY - nose.y;  // Positive = nose is above wrists
+      _smoothedNoseWristDiff = _baselineNoseWristDiff;
     }
     
     if (_baselineRuler < 0.01 || _baselineTarget < 0.01) {
@@ -228,6 +243,7 @@ class RepCounter {
     // Upper arm bone NEVER changes - it's your actual bone
     final lEl = map[PoseLandmarkType.leftElbow];
     final lWr = map[PoseLandmarkType.leftWrist];
+    final rWr = map[PoseLandmarkType.rightWrist];
     if (lSh != null && lEl != null && lWr != null) {
       double armLength = _dist3D(lSh, lWr);       // Full arm: shoulder to wrist
       double upperArm = _dist3D(lSh, lEl);        // Fixed bone: shoulder to elbow
@@ -235,6 +251,15 @@ class RepCounter {
         double rawRatio = armLength / upperArm;
         _contractionRatio = (_smoothingFactor * rawRatio) + ((1 - _smoothingFactor) * _contractionRatio);
       }
+    }
+    
+    // PUSH-UP: Track nose dropping toward wrists
+    final nose = map[PoseLandmarkType.nose];
+    if (nose != null && lWr != null && rWr != null) {
+      double avgWristY = (lWr.y + rWr.y) / 2;
+      double rawDiff = avgWristY - nose.y;  // Positive = nose above wrists, shrinks as you go down
+      _smoothedNoseWristDiff = (_smoothingFactor * rawDiff) + ((1 - _smoothingFactor) * _smoothedNoseWristDiff);
+      _currentNoseWristDiff = _smoothedNoseWristDiff;
     }
     
     // Check down/reset based on pattern
@@ -269,9 +294,15 @@ class RepCounter {
         if (isDown) {
           _intentTimer ??= DateTime.now();
           if (DateTime.now().difference(_intentTimer!).inMilliseconds > _intentDelayMs) {
-            _state = RepState.down;
-            _feedback = rule.cueGood;
-            _intentTimer = null;
+            // ANTI-RAPID-FIRE: Must wait 500ms between reps
+            if (DateTime.now().difference(_lastRepTime).inMilliseconds > 500) {
+              _state = RepState.down;
+              _repCount++;  // COUNT REP WHEN HITTING BOTTOM
+              _lastRepTime = DateTime.now();
+              _feedback = rule.cueGood;
+              _intentTimer = null;
+              return true;  // REP COUNTED HERE
+            }
           }
         } else {
           // Moved back up before confirming
@@ -282,20 +313,14 @@ class RepCounter {
 
       case RepState.down:
         if (isReset) {
-          _state = RepState.goingUp;
+          _state = RepState.up;  // Just go back to up, rep already counted
         }
         return false;
         
       case RepState.goingUp:
         if (isReset) {
-          // ANTI-RAPID-FIRE: Must wait 500ms between reps (no human does 15 reps/second)
-          if (DateTime.now().difference(_lastRepTime).inMilliseconds > 500) {
-            _state = RepState.up;
-            _repCount++;
-            _lastRepTime = DateTime.now();
-            _feedback = "";
-            return true;  // REP COUNTED
-          }
+          _state = RepState.up;
+          _feedback = "";
         } else {
           // Went back down
           _state = RepState.down;
@@ -315,12 +340,14 @@ class RepCounter {
         return _currentAngle <= rule.triggerAngle;
         
       case MovementPattern.push:
-        // FIXED BONE STRATEGY: Elbow angle + contraction ratio
-        // Elbow must bend AND arm must contract (wrist closer to shoulder)
-        // contractionRatio: ~2.0 when extended, ~1.2 when bent
-        bool elbowBent = _currentAngle <= 100;
-        bool armContracted = _contractionRatio < 1.5;
-        return elbowBent && armContracted;
+        // NOSE DROP: When nose drops to 30% or less of baseline difference from wrists
+        // At start: nose is above wrists (baseline diff is positive, e.g. 100)
+        // At bottom: nose is near wrists (diff shrinks to ~30 or less)
+        if (_baselineNoseWristDiff > 0.01) {
+          double dropRatio = _currentNoseWristDiff / _baselineNoseWristDiff;
+          return dropRatio <= 0.35;  // Nose dropped 65% of the way toward wrists
+        }
+        return false;
         
       case MovementPattern.pull:
         return _currentAngle <= rule.triggerAngle;
@@ -339,10 +366,12 @@ class RepCounter {
         return _currentAngle >= rule.resetAngle;
         
       case MovementPattern.push:
-        // Must extend arm AND elbow must straighten
-        bool elbowStraight = _currentAngle >= 150;
-        bool armExtended = _contractionRatio > 1.7;
-        return elbowStraight && armExtended;
+        // NOSE RESET: When nose goes back up to 70%+ of baseline difference
+        if (_baselineNoseWristDiff > 0.01) {
+          double dropRatio = _currentNoseWristDiff / _baselineNoseWristDiff;
+          return dropRatio >= 0.70;  // Nose back up to 70% of starting height
+        }
+        return true;
         
       case MovementPattern.pull:
         return _currentAngle >= rule.resetAngle;
