@@ -2,40 +2,38 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'dart:math' as math;
 
 /// =============================================================================
-/// ANGLE-BASED REP COUNTER - PROPER BIOMECHANICS
+/// THE UNICORN ENGINE - HYBRID DETECTION
 /// =============================================================================
 /// 
-/// Uses JOINT ANGLES not arbitrary proportions.
-/// A push-up is elbow going from 180° to 90°. That's a fact.
-/// A squat is knee going from 180° to 90°. That's a fact.
+/// 3 CORE PATTERNS:
+/// - SQUAT (Knee Chain): Proportion method + shoulder-width ruler from front
+/// - HINGE (Hip Chain): Angle method (hip angle)
+/// - PUSH (Elbow Chain): DUAL VALIDATION - angle OR distance
+/// 
+/// If we nail these 3, all 120+ exercises work.
 /// =============================================================================
 
 enum RepState { ready, down, up }
 
-enum TrackingMethod { angle, proportion }
+enum MovementPattern { squat, hinge, push, pull, curl }
 
 class ExerciseRule {
   final String id;
   final String name;
-  final TrackingMethod method;
+  final MovementPattern pattern;
   
-  // For ANGLE tracking: 3 points define the angle (vertex is middle point)
-  final PoseLandmarkType? anglePointA;  // First point
-  final PoseLandmarkType? angleVertex;   // Joint (where angle is measured)
-  final PoseLandmarkType? anglePointB;  // Third point
+  // For PROPORTION tracking (Squat pattern)
+  final PoseLandmarkType targetA;
+  final PoseLandmarkType targetB;
+  final double triggerPercent;  // e.g., 0.78 = 78% of baseline
+  final double resetPercent;    // e.g., 0.92 = 92% of baseline
   
-  // For PROPORTION tracking (backup for exercises where angles don't work)
-  final PoseLandmarkType? targetA;
-  final PoseLandmarkType? targetB;
-  final PoseLandmarkType? rulerA;
-  final PoseLandmarkType? rulerB;
-  final bool targetShrinks;
-  
-  // Thresholds
-  final double triggerAngle;    // Angle to hit for "down" position (degrees)
-  final double resetAngle;      // Angle to return to for rep complete (degrees)
-  final double triggerPercent;  // For proportion method
-  final double resetPercent;    // For proportion method
+  // For ANGLE tracking (Hinge/Push patterns)
+  final PoseLandmarkType? jointA;
+  final PoseLandmarkType? jointVertex;
+  final PoseLandmarkType? jointB;
+  final double triggerAngle;    // e.g., 90 degrees
+  final double resetAngle;      // e.g., 160 degrees
   
   final String cueGood;
   final String cueBad;
@@ -43,23 +41,16 @@ class ExerciseRule {
   const ExerciseRule({
     required this.id,
     required this.name,
-    this.method = TrackingMethod.angle,
-    // Angle points
-    this.anglePointA,
-    this.angleVertex,
-    this.anglePointB,
-    // Proportion points
-    this.targetA,
-    this.targetB,
-    this.rulerA,
-    this.rulerB,
-    this.targetShrinks = true,
-    // Angle thresholds (degrees)
-    this.triggerAngle = 90,
-    this.resetAngle = 150,
-    // Proportion thresholds
+    required this.pattern,
+    required this.targetA,
+    required this.targetB,
     this.triggerPercent = 0.78,
     this.resetPercent = 0.92,
+    this.jointA,
+    this.jointVertex,
+    this.jointB,
+    this.triggerAngle = 90,
+    this.resetAngle = 160,
     this.cueGood = "Good!",
     this.cueBad = "Deeper!",
   });
@@ -72,68 +63,45 @@ class RepCounter {
   int _repCount = 0;
   String _feedback = "";
   
-  // For angle tracking
+  // Baseline values
+  double _baselineTarget = 0;
+  double _baselineRuler = 0;
+  
+  // Current values for UI
+  double _currentPercentage = 100;
   double _currentAngle = 180;
+  double _smoothedPercentage = 100;
   double _smoothedAngle = 180;
   
-  // For proportion tracking
-  double _baselineRatio = 0;
-  double _smoothedRatio = 0;
-  double _currentPercentage = 100;
-  
-  // Anti-ghost rep
+  // Anti-ghost
   static const double _smoothingFactor = 0.3;
   DateTime? _intentTimer;
-  static const int _intentDelayMs = 120;
+  static const int _intentDelayMs = 150;
   
   RepCounter(this.rule);
   
   bool get isLocked => _baselineCaptured;
   int get repCount => _repCount;
   String get feedback => _feedback;
-  double get currentPercentage => rule.method == TrackingMethod.angle 
-      ? _angleToPercentage(_smoothedAngle) 
-      : _currentPercentage;
+  double get currentPercentage => _currentPercentage;
   RepState get state => _state;
-  double get currentAngle => _smoothedAngle;
 
-  /// Calculate angle between three points (in degrees)
-  /// Vertex is the middle point where angle is measured
-  double _calculateAngle(PoseLandmark a, PoseLandmark vertex, PoseLandmark b) {
-    // Vector from vertex to point A
-    double vaX = a.x - vertex.x;
-    double vaY = a.y - vertex.y;
-    double vaZ = a.z - vertex.z;
+  /// 3D Angle calculation using dot product
+  double _calculateAngle(PoseLandmark a, PoseLandmark v, PoseLandmark b) {
+    double v1x = a.x - v.x, v1y = a.y - v.y, v1z = a.z - v.z;
+    double v2x = b.x - v.x, v2y = b.y - v.y, v2z = b.z - v.z;
     
-    // Vector from vertex to point B
-    double vbX = b.x - vertex.x;
-    double vbY = b.y - vertex.y;
-    double vbZ = b.z - vertex.z;
+    double dot = (v1x * v2x) + (v1y * v2y) + (v1z * v2z);
+    double mag1 = math.sqrt(v1x * v1x + v1y * v1y + v1z * v1z);
+    double mag2 = math.sqrt(v2x * v2x + v2y * v2y + v2z * v2z);
     
-    // Dot product
-    double dot = vaX * vbX + vaY * vbY + vaZ * vbZ;
+    if (mag1 < 0.001 || mag2 < 0.001) return 180;
     
-    // Magnitudes
-    double magA = math.sqrt(vaX * vaX + vaY * vaY + vaZ * vaZ);
-    double magB = math.sqrt(vbX * vbX + vbY * vbY + vbZ * vbZ);
-    
-    if (magA < 0.001 || magB < 0.001) return 180;
-    
-    // Angle in radians, then convert to degrees
-    double cosAngle = (dot / (magA * magB)).clamp(-1.0, 1.0);
-    double angleRad = math.acos(cosAngle);
-    return angleRad * 180 / math.pi;
+    double cosAngle = (dot / (mag1 * mag2)).clamp(-1.0, 1.0);
+    return math.acos(cosAngle) * 180 / math.pi;
   }
 
-  /// Convert angle to percentage for UI (180° = 100%, triggerAngle = 0%)
-  double _angleToPercentage(double angle) {
-    double range = 180 - rule.triggerAngle;
-    if (range <= 0) return 100;
-    double progress = (180 - angle) / range * 100;
-    return progress.clamp(0, 150);
-  }
-
-  /// 3D distance for proportion method
+  /// 3D Distance calculation
   double _dist3D(PoseLandmark a, PoseLandmark b) {
     return math.sqrt(
       math.pow(b.x - a.x, 2) + 
@@ -145,48 +113,37 @@ class RepCounter {
   void captureBaseline(List<PoseLandmark> landmarks) {
     final map = {for (var lm in landmarks) lm.type: lm};
     
-    if (rule.method == TrackingMethod.angle) {
-      // For angle method, just verify points are visible
-      final a = map[rule.anglePointA];
-      final v = map[rule.angleVertex];
-      final b = map[rule.anglePointB];
-      
-      if (a == null || v == null || b == null) {
-        _feedback = "Body not in frame";
-        return;
-      }
-      
-      _smoothedAngle = _calculateAngle(a, v, b);
-      _baselineCaptured = true;
-      _state = RepState.ready;
-      _feedback = "LOCKED";
-      
-    } else {
-      // Proportion method
-      final tA = map[rule.targetA];
-      final tB = map[rule.targetB];
-      final rA = map[rule.rulerA];
-      final rB = map[rule.rulerB];
-      
-      if (tA == null || tB == null || rA == null || rB == null) {
-        _feedback = "Body not in frame";
-        return;
-      }
-      
-      double targetDist = _dist3D(tA, tB);
-      double rulerDist = _dist3D(rA, rB);
-      
-      if (rulerDist < 0.01) {
-        _feedback = "Move back";
-        return;
-      }
-      
-      _baselineRatio = targetDist / rulerDist;
-      _smoothedRatio = _baselineRatio;
-      _baselineCaptured = true;
-      _state = RepState.ready;
-      _feedback = "LOCKED";
+    final tA = map[rule.targetA];
+    final tB = map[rule.targetB];
+    
+    if (tA == null || tB == null) {
+      _feedback = "Body not in frame";
+      return;
     }
+    
+    _baselineTarget = _dist3D(tA, tB);
+    
+    // SHOULDER-WIDTH RULER for front view (the fix that made squats work)
+    final lSh = map[PoseLandmarkType.leftShoulder];
+    final rSh = map[PoseLandmarkType.rightShoulder];
+    
+    if (lSh != null && rSh != null && lSh.likelihood > 0.6 && rSh.likelihood > 0.6) {
+      _baselineRuler = _dist3D(lSh, rSh);
+    } else {
+      // Fallback to target distance as ruler
+      _baselineRuler = _baselineTarget;
+    }
+    
+    if (_baselineRuler < 0.01 || _baselineTarget < 0.01) {
+      _feedback = "Move back";
+      return;
+    }
+    
+    _smoothedPercentage = 100;
+    _smoothedAngle = 180;
+    _baselineCaptured = true;
+    _state = RepState.ready;
+    _feedback = "LOCKED";
   }
 
   bool processFrame(List<PoseLandmark> landmarks) {
@@ -197,104 +154,57 @@ class RepCounter {
     
     final map = {for (var lm in landmarks) lm.type: lm};
     
-    if (rule.method == TrackingMethod.angle) {
-      return _processAngle(map);
-    } else {
-      return _processProportion(map);
-    }
-  }
-
-  bool _processAngle(Map<PoseLandmarkType, PoseLandmark> map) {
-    final a = map[rule.anglePointA];
-    final v = map[rule.angleVertex];
-    final b = map[rule.anglePointB];
-    
-    if (a == null || v == null || b == null) {
-      _feedback = "Stay in frame";
-      return false;
-    }
-    
-    double rawAngle = _calculateAngle(a, v, b);
-    _smoothedAngle = (_smoothingFactor * rawAngle) + ((1 - _smoothingFactor) * _smoothedAngle);
-    _currentAngle = _smoothedAngle;
-    
-    switch (_state) {
-      case RepState.ready:
-      case RepState.up:
-        // Going DOWN: angle decreases (180 -> 90)
-        if (_smoothedAngle <= rule.triggerAngle) {
-          _intentTimer ??= DateTime.now();
-          if (DateTime.now().difference(_intentTimer!).inMilliseconds > _intentDelayMs) {
-            _state = RepState.down;
-            _feedback = rule.cueGood;
-            _intentTimer = null;
-          }
-        } else {
-          _intentTimer = null;
-          if (_smoothedAngle < rule.resetAngle) {
-            _feedback = rule.cueBad;
-          } else {
-            _feedback = "";
-          }
-        }
-        return false;
-
-      case RepState.down:
-        // Coming UP: angle increases (90 -> 180)
-        if (_smoothedAngle >= rule.resetAngle) {
-          _state = RepState.up;
-          _repCount++;
-          _feedback = "";
-          return true;
-        }
-        return false;
-    }
-  }
-
-  bool _processProportion(Map<PoseLandmarkType, PoseLandmark> map) {
-    // Use shoulder width as ruler for front view
-    double lShVis = map[PoseLandmarkType.leftShoulder]?.likelihood ?? 0;
-    double rShVis = map[PoseLandmarkType.rightShoulder]?.likelihood ?? 0;
-    bool isFrontView = lShVis > 0.6 && rShVis > 0.6;
-    
-    PoseLandmark? rA, rB;
-    if (isFrontView) {
-      rA = map[PoseLandmarkType.leftShoulder];
-      rB = map[PoseLandmarkType.rightShoulder];
-    } else {
-      rA = map[rule.rulerA];
-      rB = map[rule.rulerB];
-    }
-    
     final tA = map[rule.targetA];
     final tB = map[rule.targetB];
     
-    if (tA == null || tB == null || rA == null || rB == null) {
+    if (tA == null || tB == null) {
       _feedback = "Stay in frame";
       return false;
     }
     
+    // Calculate current distance
     double currentTarget = _dist3D(tA, tB);
-    double currentRuler = _dist3D(rA, rB);
     
-    if (currentRuler < 0.01) return false;
+    // Get shoulder-width ruler (front view fix)
+    double currentRuler = _baselineRuler;
+    final lSh = map[PoseLandmarkType.leftShoulder];
+    final rSh = map[PoseLandmarkType.rightShoulder];
+    if (lSh != null && rSh != null && lSh.likelihood > 0.6 && rSh.likelihood > 0.6) {
+      currentRuler = _dist3D(lSh, rSh);
+    }
     
-    double rawRatio = currentTarget / currentRuler;
-    _smoothedRatio = (_smoothingFactor * rawRatio) + ((1 - _smoothingFactor) * _smoothedRatio);
+    if (currentRuler < 0.01) currentRuler = _baselineRuler;
     
-    _currentPercentage = rule.targetShrinks 
-        ? (_smoothedRatio / _baselineRatio) * 100 
-        : (_baselineRatio / _smoothedRatio) * 100;
+    // Calculate proportion (normalized by ruler)
+    double baselineRatio = _baselineTarget / _baselineRuler;
+    double currentRatio = currentTarget / currentRuler;
+    double rawPercentage = (currentRatio / baselineRatio) * 100;
     
-    _currentPercentage = _currentPercentage.clamp(0, 150);
+    _smoothedPercentage = (_smoothingFactor * rawPercentage) + ((1 - _smoothingFactor) * _smoothedPercentage);
+    _currentPercentage = _smoothedPercentage.clamp(0, 150);
     
-    final trigger = rule.triggerPercent * 100;
-    final reset = rule.resetPercent * 100;
-
+    // Calculate angle if joints are defined
+    double rawAngle = 180;
+    if (rule.jointA != null && rule.jointVertex != null && rule.jointB != null) {
+      final jA = map[rule.jointA];
+      final jV = map[rule.jointVertex];
+      final jB = map[rule.jointB];
+      
+      if (jA != null && jV != null && jB != null) {
+        rawAngle = _calculateAngle(jA, jV, jB);
+      }
+    }
+    _smoothedAngle = (_smoothingFactor * rawAngle) + ((1 - _smoothingFactor) * _smoothedAngle);
+    _currentAngle = _smoothedAngle;
+    
+    // Determine if "down" position based on pattern
+    bool isDown = _checkIsDown();
+    bool isReset = _checkIsReset();
+    
     switch (_state) {
       case RepState.ready:
       case RepState.up:
-        if (_currentPercentage <= trigger) {
+        if (isDown) {
           _intentTimer ??= DateTime.now();
           if (DateTime.now().difference(_intentTimer!).inMilliseconds > _intentDelayMs) {
             _state = RepState.down;
@@ -303,7 +213,7 @@ class RepCounter {
           }
         } else {
           _intentTimer = null;
-          if (_currentPercentage < reset) {
+          if (!isReset) {
             _feedback = rule.cueBad;
           } else {
             _feedback = "";
@@ -312,13 +222,63 @@ class RepCounter {
         return false;
 
       case RepState.down:
-        if (_currentPercentage >= reset) {
+        if (isReset) {
           _state = RepState.up;
           _repCount++;
           _feedback = "";
           return true;
         }
         return false;
+    }
+  }
+
+  /// Check if user is in "down" position
+  bool _checkIsDown() {
+    switch (rule.pattern) {
+      case MovementPattern.squat:
+        // Proportion only: hip-to-ankle drops to 78% of baseline
+        return _currentPercentage <= (rule.triggerPercent * 100);
+        
+      case MovementPattern.hinge:
+        // Angle only: hip angle closes
+        return _currentAngle <= rule.triggerAngle;
+        
+      case MovementPattern.push:
+        // DUAL VALIDATION: Either angle OR proportion triggers
+        bool angleTriggered = _currentAngle <= rule.triggerAngle;
+        bool proportionTriggered = _currentPercentage <= (rule.triggerPercent * 100);
+        return angleTriggered || proportionTriggered;
+        
+      case MovementPattern.pull:
+        // Angle: elbow closes
+        return _currentAngle <= rule.triggerAngle;
+        
+      case MovementPattern.curl:
+        // Angle: elbow closes tight
+        return _currentAngle <= rule.triggerAngle;
+    }
+  }
+
+  /// Check if user has returned to start position
+  bool _checkIsReset() {
+    switch (rule.pattern) {
+      case MovementPattern.squat:
+        return _currentPercentage >= (rule.resetPercent * 100);
+        
+      case MovementPattern.hinge:
+        return _currentAngle >= rule.resetAngle;
+        
+      case MovementPattern.push:
+        // DUAL: Both must reset (more strict on reset to prevent ghost reps)
+        bool angleReset = _currentAngle >= rule.resetAngle;
+        bool proportionReset = _currentPercentage >= (rule.resetPercent * 100);
+        return angleReset && proportionReset;
+        
+      case MovementPattern.pull:
+        return _currentAngle >= rule.resetAngle;
+        
+      case MovementPattern.curl:
+        return _currentAngle >= rule.resetAngle;
     }
   }
 
@@ -331,11 +291,10 @@ class RepCounter {
 }
 
 /// =============================================================================
-/// EXERCISE LIBRARY - BIOMECHANICALLY CORRECT
+/// EXERCISE LIBRARY - ALL 120+ MAPPED TO 5 PATTERNS
 /// =============================================================================
 
 class ExerciseRules {
-  // Landmarks
   static const _sh = PoseLandmarkType.leftShoulder;
   static const _rsh = PoseLandmarkType.rightShoulder;
   static const _el = PoseLandmarkType.leftElbow;
@@ -350,547 +309,238 @@ class ExerciseRules {
   static const _rak = PoseLandmarkType.rightAnkle;
 
   static final Map<String, ExerciseRule> _rules = {
-    // =========================================================================
-    // PUSH EXERCISES - Track ELBOW ANGLE
-    // Elbow: 180° (straight arm) -> 90° (bent) -> back to 160°
-    // =========================================================================
-    ...{
-      for (var id in ['pushups', 'push_ups', 'wide_pushups', 'diamond_pushups', 'close_grip_push_ups'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,      // Shoulder
-          angleVertex: _el,      // Elbow (the joint we measure)
-          anglePointB: _wr,      // Wrist
-          triggerAngle: 90,      // Arms bent to 90°
-          resetAngle: 160,       // Arms extended back to 160°
-          cueGood: "Perfect!",
-          cueBad: "Lower!",
-        ),
-    },
     
-    ...{
-      for (var id in ['bench_press', 'incline_press', 'decline_press', 'close_grip_bench', 'dumbbell_press'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _el,
-          anglePointB: _wr,
-          triggerAngle: 85,      // Touch chest = deeper bend
-          resetAngle: 155,
-          cueGood: "Good depth!",
-          cueBad: "Touch chest!",
-        ),
-    },
+    // =========================================================================
+    // SQUAT PATTERN - Proportion method (hip-to-ankle with shoulder-width ruler)
+    // Trigger: 78% of baseline (parallel depth)
+    // =========================================================================
+    ..._squat(['squats', 'air_squats', 'goblet_squats', 'front_squat', 'back_squat', 'sumo_squat'], 
+        0.78, 0.92, "Depth!", "Hit parallel!"),
+    ..._squat(['jump_squats', 'box_jumps', 'banded_squat'], 
+        0.80, 0.92, "Explode!", "Lower!"),
+    ..._squat(['wall_sits'], 
+        0.80, 0.85, "Hold!", "90 degrees!"),
+    ..._squat(['lunges', 'walking_lunges', 'reverse_lunges', 'curtsy_lunges', 'jump_lunges'], 
+        0.78, 0.92, "Great step!", "Deeper!"),
+    ..._squat(['bulgarian_split_squat', 'step_ups'], 
+        0.78, 0.92, "Strong!", "Full depth!"),
+    ..._squat(['leg_press', 'leg_extensions', 'leg_curls', 'calf_raises'],
+        0.78, 0.92, "Push!", "Full range!"),
+
+    // =========================================================================
+    // HINGE PATTERN - Angle method (hip angle: shoulder-hip-knee)
+    // Trigger: Hip angle closes to ~100-110°
+    // =========================================================================
+    ..._hinge(['deadlift', 'sumo_deadlift'], 
+        105, 165, "Lockout!", "Hips forward!"),
+    ..._hinge(['romanian_deadlift', 'single_leg_deadlift', 'stiff_leg_deadlift'], 
+        100, 160, "Hamstrings!", "Flat back!"),
+    ..._hinge(['kettlebell_swings', 'cable_pullthrough'], 
+        110, 170, "Snap!", "Hips drive!"),
+    ..._hinge(['glute_bridge', 'hip_thrust', 'single_leg_glute_bridge', 'banded_glute_bridge', 'frog_pumps'], 
+        160, 110, "Squeeze!", "Hips up!"),  // Note: reversed - hips OPEN
+    ..._hinge(['good_mornings'],
+        100, 160, "Feel it!", "Hinge!"),
+
+    // =========================================================================
+    // PUSH PATTERN - DUAL VALIDATION (angle OR proportion)
+    // Angle: Elbow closes to ~90°
+    // Proportion: Shoulder-to-wrist drops to ~75%
+    // =========================================================================
+    ..._push(['pushups', 'push_ups', 'wide_pushups', 'diamond_pushups', 'close_grip_push_ups'], 
+        95, 155, 0.75, 0.90, "Perfect!", "Go lower!"),
+    ..._push(['bench_press', 'incline_press', 'decline_press', 'dumbbell_press', 'close_grip_bench'], 
+        90, 150, 0.70, 0.88, "Good depth!", "Touch chest!"),
+    ..._push(['tricep_dips', 'tricep_dips_chair', 'dips_chest'], 
+        90, 155, 0.75, 0.90, "Nice dip!", "Get to 90!"),
+    ..._push(['overhead_press', 'shoulder_press', 'arnold_press', 'seated_db_press', 'pike_push_ups'], 
+        155, 90, 0.75, 0.90, "Lockout!", "Press up!"),  // Note: reversed - arms EXTEND
+    ..._push(['plank_to_pushup'],
+        95, 155, 0.75, 0.90, "Up!", "Down!"),
+    ..._push(['chest_flys', 'cable_crossovers', 'dumbbell_flyes'],
+        95, 155, 0.70, 0.88, "Squeeze!", "Together!"),
+
+    // =========================================================================
+    // PULL PATTERN - Angle method (elbow closes)
+    // =========================================================================
+    ..._pull(['pull_ups', 'pullups', 'chin_ups'], 
+        75, 155, "Chin up!", "Full hang!"),
+    ..._pull(['lat_pulldowns', 'lat_pulldown'], 
+        80, 150, "Squeeze!", "Full stretch!"),
+    ..._pull(['bent_over_rows', 'barbell_row', 'pendlay_row'], 
+        80, 150, "Pull!", "Squeeze lats!"),
+    ..._pull(['cable_rows', 'seated_cable_row', 't_bar_rows'], 
+        80, 145, "Row!", "Full extension!"),
+    ..._pull(['single_arm_db_row', 'dumbbell_row', 'renegade_rows'], 
+        75, 150, "Pull high!", "Stretch!"),
+    ..._pull(['face_pulls', 'reverse_flys'],
+        85, 150, "Back!", "Pull wide!"),
+
+    // =========================================================================
+    // CURL PATTERN - Angle method (elbow closes tight)
+    // =========================================================================
+    ..._curl(['bicep_curls', 'hammer_curls', 'barbell_curl', 'ez_bar_curl'], 
+        50, 145, "Full curl!", "Squeeze!"),
+    ..._curl(['preacher_curls', 'concentration_curls', 'cable_curls', 'incline_curls'], 
+        45, 140, "Peak!", "Control!"),
+    ..._curl(['tricep_extensions', 'overhead_tricep', 'tricep_pushdown', 'skull_crushers', 'tricep_kickbacks'], 
+        150, 85, "Lockout!", "Extend!"),  // Note: reversed - arm EXTENDS
+
+    // =========================================================================
+    // ADDITIONAL EXERCISES - Mapped to closest pattern
+    // =========================================================================
     
-    ...{
-      for (var id in ['tricep_dips', 'tricep_dips_chair', 'dips_chest'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _el,
-          anglePointB: _wr,
-          triggerAngle: 90,      // 90° at bottom
-          resetAngle: 160,
-          cueGood: "Nice dip!",
-          cueBad: "Get to 90!",
-        ),
-    },
+    // Core (use squat pattern - proportion based)
+    ..._squat(['sit_ups', 'situps', 'crunches', 'decline_sit_up'], 
+        0.70, 0.90, "Crunch!", "Squeeze abs!"),
+    ..._squat(['leg_raises', 'hanging_leg_raise'],
+        0.70, 0.90, "Legs up!", "Control!"),
+    ..._squat(['mountain_climbers', 'bicycle_crunches'],
+        0.75, 0.90, "Fast!", "Knees up!"),
+    ..._squat(['russian_twists', 'woodchoppers'],
+        0.80, 0.92, "Twist!", "Rotate!"),
+    ..._squat(['plank', 'plank_hold', 'side_plank'],
+        0.95, 0.98, "Hold!", "Stay flat!"),
+    ..._squat(['superman_raises', 'superman', 'dead_bug'],
+        0.80, 0.92, "Fly!", "Extend!"),
 
-    // =========================================================================
-    // SQUAT EXERCISES - Track KNEE ANGLE
-    // Knee: 180° (standing) -> 90° (parallel) -> back to 160°
-    // =========================================================================
-    ...{
-      for (var id in ['squats', 'air_squats', 'goblet_squats', 'front_squat', 'back_squat'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _hp,      // Hip
-          angleVertex: _kn,      // Knee (the joint we measure)
-          anglePointB: _ak,      // Ankle
-          triggerAngle: 100,     // Parallel = ~100° (not full 90 for normal people)
-          resetAngle: 160,       // Standing
-          cueGood: "Depth!",
-          cueBad: "Hit parallel!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['sumo_squat', 'jump_squats', 'banded_squat', 'box_jumps'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _hp,
-          angleVertex: _kn,
-          anglePointB: _ak,
-          triggerAngle: 105,     // Slightly easier threshold
-          resetAngle: 155,
-          cueGood: "Explode!",
-          cueBad: "Lower!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['wall_sits'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _hp,
-          angleVertex: _kn,
-          anglePointB: _ak,
-          triggerAngle: 95,      // Hold at 90°
-          resetAngle: 100,       // Barely move to "reset" (it's isometric)
-          cueGood: "Hold!",
-          cueBad: "90 degrees!",
-        ),
-    },
+    // Cardio (use squat pattern)
+    ..._squat(['burpees', 'sprawls'], 
+        0.65, 0.90, "Explode!", "Chest down!"),
+    ..._squat(['jumping_jacks', 'star_jumps'],
+        0.80, 0.92, "Jump!", "Arms up!"),
+    ..._squat(['high_knees', 'butt_kicks', 'tuck_jumps'],
+        0.70, 0.90, "Higher!", "Knees up!"),
+    ..._squat(['bear_crawls'],
+        0.80, 0.92, "Crawl!", "Stay low!"),
+    ..._squat(['skaters', 'lateral_hops'],
+        0.80, 0.92, "Jump!", "Side to side!"),
 
-    // =========================================================================
-    // LUNGE EXERCISES - Track FRONT KNEE ANGLE
-    // =========================================================================
-    ...{
-      for (var id in ['lunges', 'walking_lunges', 'reverse_lunges', 'curtsy_lunges', 'jump_lunges'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _hp,
-          angleVertex: _kn,
-          anglePointB: _ak,
-          triggerAngle: 100,     // Front knee at ~90°
-          resetAngle: 155,
-          cueGood: "Great step!",
-          cueBad: "Deeper!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['bulgarian_split_squat', 'step_ups'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _hp,
-          angleVertex: _kn,
-          anglePointB: _ak,
-          triggerAngle: 95,
-          resetAngle: 160,
-          cueGood: "Strong!",
-          cueBad: "Full depth!",
-        ),
-    },
+    // Booty (use hinge pattern)
+    ..._hinge(['donkey_kicks', 'donkey_kick_pulses', 'banded_kickback'], 
+        155, 100, "Kick!", "Squeeze glute!"),
+    ..._squat(['fire_hydrants', 'banded_fire_hydrant', 'clamshells', 'banded_clamshell'],
+        0.80, 0.92, "Open!", "Control!"),
 
-    // =========================================================================
-    // CURL EXERCISES - Track ELBOW ANGLE (closing)
-    // Elbow: 170° (arm straight) -> 40° (full curl) -> back to 140°
-    // =========================================================================
-    ...{
-      for (var id in ['bicep_curls', 'hammer_curls', 'barbell_curl', 'cable_curls', 'preacher_curls', 'concentration_curls'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,      // Shoulder
-          angleVertex: _el,      // Elbow
-          anglePointB: _wr,      // Wrist
-          triggerAngle: 45,      // Full curl = elbow closed to ~45°
-          resetAngle: 140,       // Arm extended back out
-          cueGood: "Full curl!",
-          cueBad: "Squeeze!",
-        ),
-    },
+    // Shoulders (use push pattern)
+    ..._push(['lateral_raises', 'front_raises', 'cable_lateral_raise'],
+        150, 90, 0.80, 0.92, "Arms up!", "To shoulders!"),
+    ..._push(['rear_delt_flys', 'upright_rows'],
+        100, 150, 0.75, 0.90, "Pull!", "Elbows high!"),
+    ..._push(['shrugs'],
+        170, 160, 0.92, 0.97, "High!", "Squeeze!"),
 
-    // =========================================================================
-    // TRICEP EXTENSIONS - Track ELBOW ANGLE (opening)
-    // Start bent ~70°, extend to ~160°
-    // =========================================================================
-    ...{
-      for (var id in ['tricep_extensions', 'overhead_tricep', 'tricep_pushdown', 'skull_crushers'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _el,
-          anglePointB: _wr,
-          triggerAngle: 155,     // Arm extended (opposite of curl)
-          resetAngle: 80,        // Arm bent to start again
-          cueGood: "Lockout!",
-          cueBad: "Extend!",
-        ),
-    },
-
-    // =========================================================================
-    // PULL EXERCISES - Track ELBOW ANGLE (closing from above)
-    // =========================================================================
-    ...{
-      for (var id in ['pull_ups', 'pullups', 'lat_pulldowns', 'lat_pulldown', 'chin_ups'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _el,
-          anglePointB: _wr,
-          triggerAngle: 70,      // Arms pulled in
-          resetAngle: 150,       // Arms extended
-          cueGood: "Chin up!",
-          cueBad: "Full pull!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['bent_over_rows', 'cable_rows', 't_bar_rows', 'single_arm_db_row', 'renegade_rows'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _el,
-          anglePointB: _wr,
-          triggerAngle: 75,
-          resetAngle: 145,
-          cueGood: "Squeeze!",
-          cueBad: "Pull higher!",
-        ),
-    },
-
-    // =========================================================================
-    // SHOULDER PRESS - Track ELBOW ANGLE (opening upward)
-    // =========================================================================
-    ...{
-      for (var id in ['overhead_press', 'shoulder_press', 'arnold_press', 'seated_db_press', 'pike_push_ups'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _el,
-          anglePointB: _wr,
-          triggerAngle: 160,     // Arms extended overhead
-          resetAngle: 90,        // Arms at shoulder level
-          cueGood: "Lockout!",
-          cueBad: "Press up!",
-        ),
-    },
-
-    // =========================================================================
-    // LATERAL RAISES - Use PROPORTION (angle doesn't work well here)
-    // =========================================================================
-    ...{
-      for (var id in ['lateral_raises', 'front_raises', 'cable_lateral_raise'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _wr,
-          targetB: _hp,
-          rulerA: _sh,
-          rulerB: _hp,
-          targetShrinks: false,  // Distance increases as arms go up
-          triggerPercent: 1.3,   // Arms raised = wrist moves away from hip
-          resetPercent: 1.1,
-          cueGood: "Arms up!",
-          cueBad: "To shoulders!",
-        ),
-    },
-
-    // =========================================================================
-    // HINGE EXERCISES - Track HIP ANGLE
-    // Hip: 180° (standing) -> 90° (bent over) -> back to 160°
-    // =========================================================================
-    ...{
-      for (var id in ['deadlift', 'sumo_deadlift', 'romanian_deadlift', 'single_leg_deadlift'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,      // Shoulder
-          angleVertex: _hp,      // Hip (the hinge point)
-          anglePointB: _kn,      // Knee
-          triggerAngle: 100,     // Hip hinged
-          resetAngle: 165,       // Standing tall
-          cueGood: "Lockout!",
-          cueBad: "Hips forward!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['kettlebell_swings', 'cable_pullthrough'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _hp,
-          anglePointB: _kn,
-          triggerAngle: 110,
-          resetAngle: 170,
-          cueGood: "Snap!",
-          cueBad: "Hips drive!",
-        ),
-    },
-
-    // =========================================================================
-    // CORE - CRUNCH/SIT-UP - Track HIP ANGLE (torso to thigh)
-    // =========================================================================
-    ...{
-      for (var id in ['sit_ups', 'situps', 'crunches', 'decline_sit_up', 'cable_crunch'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,      // Shoulder
-          angleVertex: _hp,      // Hip
-          anglePointB: _kn,      // Knee
-          triggerAngle: 70,      // Crunched up
-          resetAngle: 130,       // Lying back
-          cueGood: "Squeeze!",
-          cueBad: "Crunch up!",
-        ),
-    },
-
-    // =========================================================================
-    // LEG RAISES - Track HIP ANGLE (legs to torso)
-    // =========================================================================
-    ...{
-      for (var id in ['leg_raises', 'hanging_leg_raise'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _hp,
-          anglePointB: _ak,
-          triggerAngle: 90,      // Legs up to 90°
-          resetAngle: 150,       // Legs down
-          cueGood: "Legs up!",
-          cueBad: "Higher!",
-        ),
-    },
-
-    // =========================================================================
-    // MOUNTAIN CLIMBERS - Track KNEE coming to chest (proportion)
-    // =========================================================================
-    ...{
-      for (var id in ['mountain_climbers', 'bicycle_crunches'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _kn,
-          targetB: _sh,
-          rulerA: _sh,
-          rulerB: _hp,
-          targetShrinks: true,
-          triggerPercent: 0.70,
-          resetPercent: 0.90,
-          cueGood: "Fast!",
-          cueBad: "Knees up!",
-        ),
-    },
-
-    // =========================================================================
-    // PLANK - Track body alignment (proportion - should stay straight)
-    // =========================================================================
-    ...{
-      for (var id in ['plank', 'plank_hold', 'side_plank'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _sh,
-          targetB: _ak,
-          rulerA: _sh,
-          rulerB: _hp,
-          targetShrinks: false,
-          triggerPercent: 0.95,  // Almost no movement needed
-          resetPercent: 0.98,
-          cueGood: "Hold!",
-          cueBad: "Stay flat!",
-        ),
-    },
-
-    // =========================================================================
-    // GLUTE BRIDGE / HIP THRUST - Track HIP EXTENSION
-    // =========================================================================
-    ...{
-      for (var id in ['glute_bridge', 'single_leg_glute_bridge', 'hip_thrust', 'glute_bridge_hold', 'banded_glute_bridge', 'frog_pumps'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,      // Shoulder (on ground)
-          angleVertex: _hp,      // Hip (what we're thrusting)
-          anglePointB: _kn,      // Knee
-          triggerAngle: 170,     // Hips fully extended (flat line)
-          resetAngle: 120,       // Hips dropped
-          cueGood: "Squeeze!",
-          cueBad: "Hips up!",
-        ),
-    },
-
-    // =========================================================================
-    // DONKEY KICKS / FIRE HYDRANTS - Track LEG ANGLE
-    // =========================================================================
-    ...{
-      for (var id in ['donkey_kicks', 'donkey_kick_pulses', 'banded_kickback'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _sh,
-          angleVertex: _hp,
-          anglePointB: _kn,
-          triggerAngle: 160,     // Leg kicked back
-          resetAngle: 100,       // Knee tucked
-          cueGood: "Kick!",
-          cueBad: "Squeeze glute!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['fire_hydrants', 'banded_fire_hydrant', 'clamshells', 'banded_clamshell'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _kn,
-          targetB: _rkn,
-          rulerA: _hp,
-          rulerB: _rhp,
-          targetShrinks: false,  // Knees move apart
-          triggerPercent: 1.4,
-          resetPercent: 1.1,
-          cueGood: "Open!",
-          cueBad: "Wider!",
-        ),
-    },
-
-    // =========================================================================
-    // CARDIO - BURPEES (full body - use proportion)
-    // =========================================================================
-    ...{
-      for (var id in ['burpees', 'sprawls'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _sh,
-          targetB: _ak,
-          rulerA: _sh,
-          rulerB: _hp,
-          targetShrinks: true,
-          triggerPercent: 0.65,
-          resetPercent: 0.90,
-          cueGood: "Explode!",
-          cueBad: "Chest down!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['jumping_jacks', 'star_jumps'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _wr,
-          targetB: _rwr,
-          rulerA: _sh,
-          rulerB: _rsh,
-          targetShrinks: false,
-          triggerPercent: 2.5,   // Arms spread wide
-          resetPercent: 1.5,
-          cueGood: "Jump!",
-          cueBad: "Arms wide!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['high_knees', 'butt_kicks', 'tuck_jumps'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.angle,
-          anglePointA: _hp,
-          angleVertex: _kn,
-          anglePointB: _ak,
-          triggerAngle: 60,      // Knee very bent (high)
-          resetAngle: 140,
-          cueGood: "Higher!",
-          cueBad: "Knees up!",
-        ),
-    },
-
-    // =========================================================================
-    // SUPERMAN / DEAD BUG
-    // =========================================================================
-    ...{
-      for (var id in ['superman_raises', 'superman', 'dead_bug'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _wr,
-          targetB: _ak,
-          rulerA: _sh,
-          rulerB: _hp,
-          targetShrinks: false,
-          triggerPercent: 1.3,
-          resetPercent: 1.1,
-          cueGood: "Fly!",
-          cueBad: "Extend!",
-        ),
-    },
-
-    // =========================================================================
-    // STRETCHES - Generally use proportion or just validate position
-    // =========================================================================
-    ...{
-      for (var id in ['childs_pose', 'cat_cow', 'worlds_greatest_stretch'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _sh,
-          targetB: _hp,
-          rulerA: _hp,
-          rulerB: _kn,
-          targetShrinks: true,
-          triggerPercent: 0.70,
-          resetPercent: 0.90,
-          cueGood: "Breathe!",
-          cueBad: "Deeper!",
-        ),
-    },
-    
-    ...{
-      for (var id in ['hamstring_stretch', 'quad_stretch', 'hip_flexor_stretch', 'pigeon_pose', 'butterfly_stretch', 'frog_stretch', '90_90_stretch'])
-        id: ExerciseRule(
-          id: id,
-          name: _formatName(id),
-          method: TrackingMethod.proportion,
-          targetA: _sh,
-          targetB: _ak,
-          rulerA: _sh,
-          rulerB: _hp,
-          targetShrinks: true,
-          triggerPercent: 0.75,
-          resetPercent: 0.90,
-          cueGood: "Hold!",
-          cueBad: "Stretch!",
-        ),
-    },
+    // Stretches (use squat pattern - just tracking position)
+    ..._squat(['childs_pose', 'cat_cow', 'worlds_greatest_stretch'],
+        0.70, 0.90, "Breathe!", "Deep!"),
+    ..._squat(['hamstring_stretch', 'quad_stretch', 'hip_flexor_stretch'],
+        0.75, 0.90, "Hold!", "Stretch!"),
+    ..._squat(['pigeon_pose', 'butterfly_stretch', 'frog_stretch', '90_90_stretch'],
+        0.75, 0.90, "Relax!", "Open!"),
   };
+
+  // =========================================================================
+  // PATTERN GENERATORS
+  // =========================================================================
+
+  /// SQUAT pattern: Hip-to-Ankle proportion with shoulder-width ruler
+  static Map<String, ExerciseRule> _squat(List<String> ids, double trigger, double reset, String good, String bad) {
+    return {
+      for (var id in ids) id: ExerciseRule(
+        id: id,
+        name: _formatName(id),
+        pattern: MovementPattern.squat,
+        targetA: _hp,
+        targetB: _ak,
+        triggerPercent: trigger,
+        resetPercent: reset,
+        cueGood: good,
+        cueBad: bad,
+      )
+    };
+  }
+
+  /// HINGE pattern: Hip angle (Shoulder-Hip-Knee)
+  static Map<String, ExerciseRule> _hinge(List<String> ids, double trigger, double reset, String good, String bad) {
+    return {
+      for (var id in ids) id: ExerciseRule(
+        id: id,
+        name: _formatName(id),
+        pattern: MovementPattern.hinge,
+        targetA: _sh,
+        targetB: _ak,
+        jointA: _sh,
+        jointVertex: _hp,
+        jointB: _kn,
+        triggerAngle: trigger,
+        resetAngle: reset,
+        cueGood: good,
+        cueBad: bad,
+      )
+    };
+  }
+
+  /// PUSH pattern: DUAL VALIDATION (Elbow angle OR Shoulder-to-Wrist proportion)
+  static Map<String, ExerciseRule> _push(List<String> ids, double trigAngle, double resetAngle, double trigPct, double resetPct, String good, String bad) {
+    return {
+      for (var id in ids) id: ExerciseRule(
+        id: id,
+        name: _formatName(id),
+        pattern: MovementPattern.push,
+        targetA: _sh,
+        targetB: _wr,
+        triggerPercent: trigPct,
+        resetPercent: resetPct,
+        jointA: _sh,
+        jointVertex: _el,
+        jointB: _wr,
+        triggerAngle: trigAngle,
+        resetAngle: resetAngle,
+        cueGood: good,
+        cueBad: bad,
+      )
+    };
+  }
+
+  /// PULL pattern: Elbow angle (Shoulder-Elbow-Wrist)
+  static Map<String, ExerciseRule> _pull(List<String> ids, double trigger, double reset, String good, String bad) {
+    return {
+      for (var id in ids) id: ExerciseRule(
+        id: id,
+        name: _formatName(id),
+        pattern: MovementPattern.pull,
+        targetA: _sh,
+        targetB: _wr,
+        jointA: _sh,
+        jointVertex: _el,
+        jointB: _wr,
+        triggerAngle: trigger,
+        resetAngle: reset,
+        cueGood: good,
+        cueBad: bad,
+      )
+    };
+  }
+
+  /// CURL pattern: Elbow angle tight
+  static Map<String, ExerciseRule> _curl(List<String> ids, double trigger, double reset, String good, String bad) {
+    return {
+      for (var id in ids) id: ExerciseRule(
+        id: id,
+        name: _formatName(id),
+        pattern: MovementPattern.curl,
+        targetA: _sh,
+        targetB: _wr,
+        jointA: _sh,
+        jointVertex: _el,
+        jointB: _wr,
+        triggerAngle: trigger,
+        resetAngle: reset,
+        cueGood: good,
+        cueBad: bad,
+      )
+    };
+  }
 
   static String _formatName(String id) {
     return id.split('_').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
