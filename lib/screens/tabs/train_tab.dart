@@ -171,34 +171,29 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         _formScore = _session?.formScore ?? 0;
 
         // DOPAMINE HUD: Update skeleton state based on rep phase
-        final repState = _session?.repState;
-        final chargeProgress = _session?.chargeProgress ?? 0.0;
+        // IMPORTANT: Don't overwrite success state during rep flash animation!
+        if (!_showRepFlash) {
+          final repState = _session?.repState;
+          final chargeProgress = _session?.chargeProgress ?? 0.0;
 
-        if (repState == RepState.goingDown) {
-          // Descending - CHARGING (blue → lime transition)
-          _skeletonState = SkeletonState.charging;
-          _chargeProgress = chargeProgress;
-          _powerGaugeFill = chargeProgress;
-        } else if (repState == RepState.down) {
-          // Hit target depth - PEAK (gold flash!)
-          _skeletonState = SkeletonState.peak;
-          _chargeProgress = 1.0;
-          _powerGaugeFill = 1.0;
-        } else if (repState == RepState.goingUp) {
-          // Ascending - stay at peak until rep counts
-          _skeletonState = SkeletonState.peak;
-          _powerGaugeFill = 1.0;
-        } else if (repState == RepState.up) {
-          // Rep just counted - SUCCESS (emerald flash!)
-          _skeletonState = SkeletonState.success;
-          _chargeProgress = 0.0;
-          _powerGaugeFill = 0.0;
-        } else {
-          // Ready/idle - waiting for next rep
-          _skeletonState = SkeletonState.idle;
-          _chargeProgress = 0.0;
-          _powerGaugeFill = 0.0;
+          if (repState == RepState.goingDown || repState == RepState.down) {
+            // Descending OR at bottom - CHARGING (lime, building power)
+            // Combined these states so lime shows for longer
+            _skeletonState = SkeletonState.charging;
+            _chargeProgress = chargeProgress;
+            _powerGaugeFill = chargeProgress;
+          } else if (repState == RepState.goingUp) {
+            // Ascending - PEAK (gold, holding power)
+            _skeletonState = SkeletonState.peak;
+            _powerGaugeFill = 1.0;
+          } else {
+            // Ready/idle - waiting for next rep
+            _skeletonState = SkeletonState.idle;
+            _chargeProgress = 0.0;
+            _powerGaugeFill = 0.0;
+          }
         }
+        // Note: SUCCESS state is handled in onRepCounted callback
       });
     } else {
       // Body lost
@@ -274,7 +269,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       }
 
       // Hide flash and return to idle after animation
-      Future.delayed(const Duration(milliseconds: 300), () {
+      // Extended to 500ms so green flash is clearly visible
+      Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
           setState(() {
             _showRepFlash = false;

@@ -43,30 +43,32 @@ class SkeletonPainter extends CustomPainter {
 
   /// Get skeleton color based on SKELETON STATE
   /// Dopamine ladder: Blue → Lime → Gold → Green
+  /// Colors made EXTRA vibrant and distinct for clear visual feedback
   Color get _skeletonColor {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return const Color(0xFF00F0FF); // Electric Blue/Cyan
+        return const Color(0xFF00E0FF); // Bright Electric Blue
       case SkeletonState.charging:
-        return const Color(0xFFCCFF00); // Cyber Lime
+        return const Color(0xFFAAFF00); // Bright Cyber Lime (more green, less yellow)
       case SkeletonState.peak:
-        return const Color(0xFFFFD700); // Gold
+        return const Color(0xFFFFAA00); // Bright Orange-Gold (distinct from lime)
       case SkeletonState.success:
-        return const Color(0xFF00FF88); // Emerald Green
+        return const Color(0xFF00FF66); // Vibrant Emerald Green
     }
   }
 
   /// Get joint color - matches skeleton state
+  /// Joints are brighter and more saturated than bones for pop
   Color get _jointColor {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return const Color(0xFF00F0FF).withOpacity(0.8); // Electric Blue
+        return const Color(0xFF00E0FF); // Bright Electric Blue
       case SkeletonState.charging:
-        return const Color(0xFFCCFF00); // Cyber Lime - full opacity
+        return const Color(0xFFAAFF00); // Bright Cyber Lime - full opacity
       case SkeletonState.peak:
-        return const Color(0xFFFFD700); // Gold - achievement
+        return const Color(0xFFFFAA00); // Bright Orange-Gold
       case SkeletonState.success:
-        return const Color(0xFF00FF88); // Emerald Green
+        return const Color(0xFF00FF66); // Vibrant Emerald Green
     }
   }
 

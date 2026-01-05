@@ -214,13 +214,10 @@ class WorkoutSession {
 
     _isResting = false;
 
-    // IMPORTANT: Create fresh engine for new set
-    // This resets baseline so it can re-lock on user's current position
-    if (_currentExerciseId.isNotEmpty) {
-      _engine = MovementEngine();
-      _engine.loadExercise(_currentExerciseId);
-    }
-    _baselineCaptured = false;
+    // CRITICAL FIX: Reset the pattern state AND force baseline recapture
+    // This allows the engine to lock onto the user's current position for the new set
+    _engine.reset();  // Resets rep count and pattern state to ready
+    _baselineCaptured = false;  // Forces baseline recapture on next frame
 
     // Reset combo tracking for new set
     _currentCombo = 0;
