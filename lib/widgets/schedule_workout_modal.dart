@@ -2,17 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
-import '../models/workout_models.dart';
 
 /// Modal for scheduling a workout on a specific date
 class ScheduleWorkoutModal extends StatefulWidget {
   final DateTime selectedDate;
-  final Workout? currentWorkout;
 
   const ScheduleWorkoutModal({
     super.key,
     required this.selectedDate,
-    this.currentWorkout,
   });
 
   @override

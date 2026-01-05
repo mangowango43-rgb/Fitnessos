@@ -4,7 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/app_colors.dart';
 import '../../providers/stats_provider.dart';
 import '../../providers/workout_provider.dart';
+import '../../providers/workout_schedule_provider.dart';
+import '../../models/workout_schedule.dart';
 import '../../widgets/animated_counter.dart';
+import '../../widgets/schedule_workout_modal.dart';
+import '../../widgets/workout_library_modal.dart';
 import '../home_screen.dart' show TabNavigator;
 import '../tabs/settings_tab.dart';
 
@@ -276,6 +280,10 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               });
               HapticFeedback.selectionClick();
             },
+            onLongPress: () async {
+              HapticFeedback.heavyImpact();
+              await _openScheduleWorkoutFlow(date);
+            },
             child: Container(
               width: 50,
               margin: const EdgeInsets.only(right: 10),
@@ -533,14 +541,11 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       
                       const SizedBox(width: 12),
                       
-                      // EDIT Button (Small)
+                      // SWAP Button (Small)
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
                           HapticFeedback.mediumImpact();
-                          final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-                          if (navigator != null) {
-                            (navigator as dynamic).changeTab(2); // Workouts tab
-                          }
+                          await _openWorkoutLibrary();
                         },
                         child: Container(
                           padding: const EdgeInsets.all(16),
@@ -553,7 +558,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                             ),
                           ),
                           child: const Icon(
-                            Icons.edit_outlined,
+                            Icons.swap_horiz,
                             color: Colors.white,
                             size: 20,
                           ),
@@ -991,5 +996,86 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCHEDULING METHODS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Open workout library to swap hero workout
+  Future<void> _openWorkoutLibrary() async {
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const WorkoutLibraryModal(),
+    );
+
+    if (selected != null && mounted) {
+      // TODO: Lock the selected workout as hero
+      // For now, show confirmation
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${selected['name']} selected! (Integration coming)'),
+          backgroundColor: AppColors.cyberLime,
+        ),
+      );
+    }
+  }
+
+  /// Open schedule workout flow (date long-press)
+  Future<void> _openScheduleWorkoutFlow(DateTime date) async {
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ScheduleWorkoutModal(selectedDate: date),
+    );
+
+    if (result == null || !mounted) return;
+
+    // User set time/alarm, now show workout library
+    final selectedWorkout = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const WorkoutLibraryModal(),
+    );
+
+    if (selectedWorkout != null && mounted) {
+      final timeData = result['time'] as TimeOfDay?;
+      final hasAlarm = result['hasAlarm'] as bool;
+
+      // Create schedule
+      final schedule = WorkoutSchedule(
+        id: '${DateTime.now().millisecondsSinceEpoch}',
+        workoutId: selectedWorkout['id'] as String,
+        workoutName: selectedWorkout['name'] as String,
+        scheduledDate: DateTime(date.year, date.month, date.day),
+        scheduledTime: timeData != null 
+            ? '${timeData.hour.toString().padLeft(2, '0')}:${timeData.minute.toString().padLeft(2, '0')}'
+            : null,
+        hasAlarm: hasAlarm,
+        createdAt: DateTime.now(),
+      );
+
+      // Save schedule
+      await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              hasAlarm 
+                  ? '✅ ${selectedWorkout['name']} scheduled with alarm!'
+                  : '✅ ${selectedWorkout['name']} scheduled!',
+            ),
+            backgroundColor: AppColors.cyberLime,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
 }
+
 

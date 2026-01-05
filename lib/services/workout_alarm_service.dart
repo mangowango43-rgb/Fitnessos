@@ -120,12 +120,15 @@ class WorkoutAlarmService {
 
       debugPrint('📅 Will fire at: $scheduledTime');
 
+      // Get motivational quote (can't be called in const context)
+      final motivationalText = '${_getMotivationalQuote()}\n\nTap to start your workout!';
+
       await _notifications.zonedSchedule(
         schedule.alarmId,
         '💪 ${schedule.workoutName}',
-        '${_getMotivationalQuote()}\n\nTap to start your workout!',
+        motivationalText,
         scheduledTime,
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
             _channelName,
@@ -136,12 +139,10 @@ class WorkoutAlarmService {
             enableVibration: true,
             enableLights: true,
             fullScreenIntent: true,
-            largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-            styleInformation: BigTextStyleInformation(
-              '${_getMotivationalQuote()}\n\nTap to start your workout!',
-            ),
+            largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+            styleInformation: BigTextStyleInformation(motivationalText),
           ),
-          iOS: DarwinNotificationDetails(
+          iOS: const DarwinNotificationDetails(
             presentAlert: true,
             presentSound: true,
             presentBadge: true,
