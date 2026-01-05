@@ -173,11 +173,11 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         // GAMING: Update skeleton state and power gauge based on rep phase
         final repState = _session?.repState;
         final chargeProgress = _session?.chargeProgress ?? 0.0;
-        
+
         // Check for bad form feedback - AGGRESSIVE detection
-        final hasBadFormFeedback = _feedback.isNotEmpty && 
-                                   (_feedback.contains('!') || 
-                                    _feedback.contains('Keep') || 
+        final hasBadFormFeedback = _feedback.isNotEmpty &&
+                                   (_feedback.contains('!') ||
+                                    _feedback.contains('Keep') ||
                                     _feedback.contains('Don') ||
                                     _feedback.contains('deeper') ||
                                     _feedback.contains('higher') ||
@@ -185,30 +185,28 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                                     _feedback.contains('cave') ||
                                     _feedback.contains('pike') ||
                                     _feedback.contains('sag'));
-        
+
         // DEBUG: Log form feedback and score
         if (_feedback.isNotEmpty && _feedback != 'Get in frame') {
           print('🔴 FORM CHECK: "$_feedback" | Score: $_formScore | HasBadFeedback: $hasBadFormFeedback');
         }
 
-        if (hasBadFormFeedback && _formScore < 80) {
-          // BAD FORM DETECTED - Turn skeleton RED
-          print('🚨 SKELETON → RED (bad form detected)');
-          _skeletonState = SkeletonState.error;
-          _chargeProgress = chargeProgress;
-          _powerGaugeFill = chargeProgress;
-        } else if (repState == RepState.down) {
-          // User is in the down position - CHARGING state
+        if (repState == RepState.goingDown || repState == RepState.down) {
+          // User is descending - CHARGING state - bar FILLS UP
           _skeletonState = SkeletonState.charging;
           _chargeProgress = chargeProgress;
           _powerGaugeFill = chargeProgress;
+        } else if (repState == RepState.goingUp) {
+          // User is ascending - keep bar full until rep counts
+          _skeletonState = SkeletonState.charging;
+          _powerGaugeFill = 1.0;  // Stay full during ascent
         } else if (repState == RepState.up) {
-          // User completed rep - back to IDLE
-          _skeletonState = SkeletonState.idle;
-          // Keep power gauge filled briefly during ascent
-          _powerGaugeFill = chargeProgress;
+          // Rep just counted - flash then empty
+          _skeletonState = SkeletonState.perfect;
+          _chargeProgress = 0.0;
+          _powerGaugeFill = 0.0;  // Empty after rep counts
         } else {
-          // At rest position
+          // Ready state - bar empty, waiting for descent
           _skeletonState = SkeletonState.idle;
           _chargeProgress = 0.0;
           _powerGaugeFill = 0.0;

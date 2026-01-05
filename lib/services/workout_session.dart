@@ -213,8 +213,20 @@ class WorkoutSession {
     if (!_isResting) return;
 
     _isResting = false;
-    _engine.reset();
+
+    // IMPORTANT: Create fresh engine for new set
+    // This resets baseline so it can re-lock on user's current position
+    if (_currentExerciseId.isNotEmpty) {
+      _engine = MovementEngine();
+      _engine.loadExercise(_currentExerciseId);
+    }
     _baselineCaptured = false;
+
+    // Reset combo tracking for new set
+    _currentCombo = 0;
+    _repHistory = [];
+    _setStartTime = DateTime.now();
+
     _voice.speakNow('Set ${_currentSetIndex + 1}. Go!');
   }
   
