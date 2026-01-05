@@ -51,7 +51,7 @@ class SkeletonPainter extends CustomPainter {
       case SkeletonState.perfect:
         return AppColors.cyberLime; // LIME FLASH on perfect rep
       case SkeletonState.error:
-        return AppColors.neonCrimson; // Red on error
+        return AppColors.white70; // Keep white on error (no red)
     }
   }
 
@@ -65,7 +65,7 @@ class SkeletonPainter extends CustomPainter {
       case SkeletonState.perfect:
         return AppColors.cyberLime; // LIME joints on perfect
       case SkeletonState.error:
-        return AppColors.neonCrimson;
+        return AppColors.white70; // Keep white on error (no red)
     }
   }
 
@@ -81,7 +81,7 @@ class SkeletonPainter extends CustomPainter {
       case SkeletonState.perfect:
         return 16.0; // MAXIMUM GLOW on perfect flash
       case SkeletonState.error:
-        return 10.0;
+        return 3.0; // Normal glow on error (no intense red glow)
     }
   }
 
@@ -96,7 +96,7 @@ class SkeletonPainter extends CustomPainter {
       case SkeletonState.perfect:
         return 6.0; // THICK for perfect flash
       case SkeletonState.error:
-        return 4.0;
+        return 3.0; // Normal width on error
     }
   }
 
