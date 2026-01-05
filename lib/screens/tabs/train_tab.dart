@@ -72,8 +72,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   bool _showPhoneGuide = false;
   bool _isScanning = false;
   bool _isLocked = false;
-  int _countdownValue = 3;
+  int _countdownValue = 5; // Changed to 5 for 5,4,3,2,1,GO
   Timer? _countdownTimer;
+  bool _hasSpokenExerciseName = false; // Track if we've said the exercise name
 
   @override
   void initState() {
@@ -164,7 +165,10 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       // Reset countdown if body lost during countdown (before scanning)
       if (_showCountdown && !bodyInFrame && wasBodyDetected && !_isScanning && !_isLocked) {
         _countdownTimer?.cancel();
-        setState(() => _countdownValue = 3);
+        setState(() {
+          _countdownValue = 5; // Reset to 5
+          _hasSpokenExerciseName = false;
+        });
       }
       
       // Only process workout if countdown complete
@@ -255,7 +259,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _countdownComplete = false;
       _isScanning = false;
       _isLocked = false;
-      _countdownValue = 3;
+      _countdownValue = 5; // Reset to 5
+      _hasSpokenExerciseName = false;
     });
     
     // If body already detected, start countdown immediately
@@ -336,17 +341,48 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
 
   void _startCountdownTimer() {
     _countdownTimer?.cancel();
+    
+    // First, speak the exercise name and instruction
+    if (!_hasSpokenExerciseName && _lockedWorkout != null && _currentExerciseIndex < _lockedWorkout!.exercises.length) {
+      final exerciseName = _lockedWorkout!.exercises[_currentExerciseIndex].name;
+      // Speak: "[Exercise Name], get in your position"
+      print('🎤 Speaking: $exerciseName, get in your position');
+      // TODO: Uncomment when TTS is enabled
+      // _tts.speak('$exerciseName, get in your position');
+      setState(() => _hasSpokenExerciseName = true);
+      
+      // Wait 2 seconds before starting countdown
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && _bodyDetected) {
+          _startActualCountdown();
+        }
+      });
+    }
+  }
+  
+  void _startActualCountdown() {
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
       
+      // Speak the countdown number
+      if (_countdownValue > 0) {
+        print('🎤 Speaking: $_countdownValue');
+        // TODO: Uncomment when TTS is enabled
+        // _tts.speak('$_countdownValue');
+      } else if (_countdownValue == 0) {
+        print('🎤 Speaking: GO!');
+        // TODO: Uncomment when TTS is enabled
+        // _tts.speak('GO');
+      }
+      
       setState(() {
         _countdownValue--;
       });
       
-      if (_countdownValue <= 0) {
+      if (_countdownValue < 0) {
         timer.cancel();
         _startScanning();
       }
@@ -366,7 +402,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         // Body lost during scanning, reset
         setState(() {
           _isScanning = false;
-          _countdownValue = 3;
+          _countdownValue = 5; // Reset to 5
+          _hasSpokenExerciseName = false;
         });
       }
     });
@@ -613,22 +650,38 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                     textAlign: TextAlign.center,
                   ),
                 ]
-                // Phase 2: COUNTDOWN 3, 2, 1 (body detected, counting down)
+                // Phase 2: COUNTDOWN 5, 4, 3, 2, 1 (body detected, counting down)
                 else if (_bodyDetected && !_isScanning && !_isLocked) ...[
-                  Text(
-                    '$_countdownValue',
-                    style: TextStyle(
-                      fontSize: 150,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.electricCyan,
-                      shadows: [
-                        Shadow(
-                          color: AppColors.electricCyan.withOpacity(0.8),
-                          blurRadius: 40,
-                        ),
-                      ],
+                  if (_countdownValue > 0)
+                    Text(
+                      '$_countdownValue',
+                      style: TextStyle(
+                        fontSize: 150,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.electricCyan,
+                        shadows: [
+                          Shadow(
+                            color: AppColors.electricCyan.withOpacity(0.8),
+                            blurRadius: 40,
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Text(
+                      'GO!',
+                      style: TextStyle(
+                        fontSize: 100,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.cyberLime,
+                        shadows: [
+                          Shadow(
+                            color: AppColors.cyberLime.withOpacity(0.8),
+                            blurRadius: 40,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'HOLD POSITION',
