@@ -1,26 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../services/exercise_media_service.dart';
+import 'package:cached_network_image.dart';
+import '../services/exercise_animation_database.dart';
 import '../utils/app_colors.dart';
 
 /// =============================================================================
-/// EXERCISE ANIMATION WIDGET
+/// EXERCISE ANIMATION WIDGET - SIMPLIFIED & WORKING
 /// =============================================================================
-/// Displays exercise GIF/animation with smart loading and caching
-/// 
-/// Features:
-/// - Only loads when visible (battery optimization)
-/// - Cached images (no repeated downloads)
-/// - Pattern-based fallbacks
-/// - Loading shimmer effect
+/// Displays exercise GIF/animation from ExerciseDB v2
+/// Uses real working URLs - NO API KEY NEEDED!
 /// =============================================================================
 
-class ExerciseAnimationWidget extends StatefulWidget {
+class ExerciseAnimationWidget extends StatelessWidget {
   final String exerciseId;
   final double? width;
   final double? height;
   final BoxFit fit;
-  final bool autoPlay;
   final BorderRadius? borderRadius;
 
   const ExerciseAnimationWidget({
@@ -29,75 +23,38 @@ class ExerciseAnimationWidget extends StatefulWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
-    this.autoPlay = true,
     this.borderRadius,
   });
 
   @override
-  State<ExerciseAnimationWidget> createState() => _ExerciseAnimationWidgetState();
-}
-
-class _ExerciseAnimationWidgetState extends State<ExerciseAnimationWidget> {
-  final ExerciseMediaService _mediaService = ExerciseMediaService();
-  String? _animationUrl;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAnimation();
-  }
-
-  Future<void> _loadAnimation() async {
-    try {
-      final url = await _mediaService.getAnimationUrl(widget.exerciseId);
-      if (mounted) {
-        setState(() {
-          _animationUrl = url;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('⚠️ Error loading animation for ${widget.exerciseId}: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final animationUrl = ExerciseAnimationDatabase.getAnimationUrl(exerciseId);
+    
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
-        borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
+        borderRadius: borderRadius ?? BorderRadius.circular(12),
         color: AppColors.white5,
       ),
       child: ClipRRect(
-        borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
-        child: _isLoading
-            ? _buildLoadingShimmer()
-            : _animationUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: _animationUrl!,
-                    width: widget.width,
-                    height: widget.height,
-                    fit: widget.fit,
-                    placeholder: (context, url) => _buildLoadingShimmer(),
-                    errorWidget: (context, url, error) => _buildErrorWidget(),
-                  )
-                : _buildErrorWidget(),
+        borderRadius: borderRadius ?? BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: animationUrl,
+          width: width,
+          height: height,
+          fit: fit,
+          placeholder: (context, url) => _buildLoadingShimmer(),
+          errorWidget: (context, url, error) => _buildErrorWidget(),
+        ),
       ),
     );
   }
 
   Widget _buildLoadingShimmer() {
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -121,8 +78,8 @@ class _ExerciseAnimationWidgetState extends State<ExerciseAnimationWidget> {
 
   Widget _buildErrorWidget() {
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: width,
+      height: height,
       color: AppColors.white5,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -130,11 +87,11 @@ class _ExerciseAnimationWidgetState extends State<ExerciseAnimationWidget> {
           Icon(
             Icons.fitness_center,
             color: AppColors.white30,
-            size: widget.height != null ? widget.height! * 0.4 : 48,
+            size: height != null ? height! * 0.4 : 48,
           ),
           const SizedBox(height: 8),
           Text(
-            widget.exerciseId.replaceAll('_', ' ').toUpperCase(),
+            exerciseId.replaceAll('_', ' ').toUpperCase(),
             style: const TextStyle(
               color: AppColors.white30,
               fontSize: 10,
@@ -271,4 +228,3 @@ class ExerciseAnimationPIP extends StatelessWidget {
     );
   }
 }
-
