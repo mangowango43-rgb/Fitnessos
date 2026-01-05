@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'utils/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding/v2_onboarding_main.dart';
 import 'screens/auth/sign_in_screen.dart';
+import 'services/workout_alarm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize timezone database
+  tz.initializeTimeZones();
+  
+  // Initialize workout alarm service
+  await WorkoutAlarmService.initialize();
   
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
