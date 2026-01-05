@@ -170,43 +170,31 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         // _feedback removed - voice coach handles feedback now
         _formScore = _session?.formScore ?? 0;
 
-        // GAMING: Update skeleton state and power gauge based on rep phase
+        // DOPAMINE HUD: Update skeleton state based on rep phase
         final repState = _session?.repState;
         final chargeProgress = _session?.chargeProgress ?? 0.0;
 
-        // Check for bad form feedback - AGGRESSIVE detection
-        final hasBadFormFeedback = _feedback.isNotEmpty &&
-                                   (_feedback.contains('!') ||
-                                    _feedback.contains('Keep') ||
-                                    _feedback.contains('Don') ||
-                                    _feedback.contains('deeper') ||
-                                    _feedback.contains('higher') ||
-                                    _feedback.contains('Squeeze') ||
-                                    _feedback.contains('cave') ||
-                                    _feedback.contains('pike') ||
-                                    _feedback.contains('sag'));
-
-        // DEBUG: Log form feedback and score
-        if (_feedback.isNotEmpty && _feedback != 'Get in frame') {
-          print('🔴 FORM CHECK: "$_feedback" | Score: $_formScore | HasBadFeedback: $hasBadFormFeedback');
-        }
-
-        if (repState == RepState.goingDown || repState == RepState.down) {
-          // User is descending - CHARGING state - bar FILLS UP
+        if (repState == RepState.goingDown) {
+          // Descending - CHARGING (blue → lime transition)
           _skeletonState = SkeletonState.charging;
           _chargeProgress = chargeProgress;
           _powerGaugeFill = chargeProgress;
+        } else if (repState == RepState.down) {
+          // Hit target depth - PEAK (gold flash!)
+          _skeletonState = SkeletonState.peak;
+          _chargeProgress = 1.0;
+          _powerGaugeFill = 1.0;
         } else if (repState == RepState.goingUp) {
-          // User is ascending - keep bar full until rep counts
-          _skeletonState = SkeletonState.charging;
-          _powerGaugeFill = 1.0;  // Stay full during ascent
+          // Ascending - stay at peak until rep counts
+          _skeletonState = SkeletonState.peak;
+          _powerGaugeFill = 1.0;
         } else if (repState == RepState.up) {
-          // Rep just counted - flash then empty
-          _skeletonState = SkeletonState.perfect;
+          // Rep just counted - SUCCESS (emerald flash!)
+          _skeletonState = SkeletonState.success;
           _chargeProgress = 0.0;
-          _powerGaugeFill = 0.0;  // Empty after rep counts
+          _powerGaugeFill = 0.0;
         } else {
-          // Ready state - bar empty, waiting for descent
+          // Ready/idle - waiting for next rep
           _skeletonState = SkeletonState.idle;
           _chargeProgress = 0.0;
           _powerGaugeFill = 0.0;
@@ -260,30 +248,31 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     // Set up callbacks
     _session!.onRepCounted = (reps, score) {
       print('🎯 REP COMPLETED: Rep $reps with score $score');
-      
+
       setState(() {
         _showRepFlash = true;
         _formScore = score;
-        
-        // GAMING: Flash skeleton to PERFECT state
-        _skeletonState = SkeletonState.perfect;
+
+        // DOPAMINE HUD: Flash skeleton to SUCCESS state (emerald green)
+        _skeletonState = SkeletonState.success;
       });
-      
+
+      // JUICE: Heavy haptic on rep count - feel the win!
       // Trigger haptic based on form score
       if (score >= 85) {
-        // PERFECT REP
+        // PERFECT REP - Heavy impact
         print('📳 Triggering PERFECT haptic');
         HapticHelper.perfectRepHaptic();
       } else if (score >= 60) {
-        // GOOD REP
+        // GOOD REP - Medium impact
         print('📳 Triggering GOOD haptic');
         HapticHelper.goodRepHaptic();
       } else {
-        // MISSED REP
+        // MISSED REP - Light impact (but still positive!)
         print('📳 Triggering MISSED haptic');
         HapticHelper.missedRepHaptic();
       }
-      
+
       // Hide flash and return to idle after animation
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {

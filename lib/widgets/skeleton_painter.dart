@@ -10,12 +10,12 @@ enum FormQuality {
   neutral, // Cyan - no exercise active / between reps
 }
 
-/// Skeleton state for gaming-style visual feedback
+/// Dopamine HUD states - positive feedback only, no red/error
 enum SkeletonState {
-  idle,      // White - waiting for next rep
-  charging,  // Cyan - user descending into rep, lines thickening
-  perfect,   // Lime flash - perfect rep completed
-  error,     // Red - bad form detected
+  idle,      // Electric Blue - waiting, system ready
+  charging,  // Cyber Lime + Cyan glow - descending, building power
+  peak,      // Gold/Yellow - hit target depth, achievement unlocked
+  success,   // Emerald Green - rep counted, the big win
 }
 
 /// CustomPainter that draws a glowing cyber-themed skeleton overlay
@@ -41,62 +41,62 @@ class SkeletonPainter extends CustomPainter {
     this.currentAngle,
   });
 
-  /// Get skeleton color based on SKELETON STATE (for gaming feedback)
+  /// Get skeleton color based on SKELETON STATE
+  /// Dopamine ladder: Blue → Lime → Gold → Green
   Color get _skeletonColor {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return AppColors.white70; // White when idle
+        return const Color(0xFF00F0FF); // Electric Blue/Cyan
       case SkeletonState.charging:
-        return AppColors.electricCyan; // Cyan when charging
-      case SkeletonState.perfect:
-        return AppColors.cyberLime; // LIME FLASH on perfect rep
-      case SkeletonState.error:
-        return AppColors.white70; // Keep white on error (no red)
+        return const Color(0xFFCCFF00); // Cyber Lime
+      case SkeletonState.peak:
+        return const Color(0xFFFFD700); // Gold
+      case SkeletonState.success:
+        return const Color(0xFF00FF88); // Emerald Green
     }
   }
 
-  /// Get joint color based on skeleton state
+  /// Get joint color - matches skeleton state
   Color get _jointColor {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return AppColors.white70; // WHITE when idle (same as lines)
+        return const Color(0xFF00F0FF).withOpacity(0.8); // Electric Blue
       case SkeletonState.charging:
-        return AppColors.electricCyan; // BLUE when charging
-      case SkeletonState.perfect:
-        return AppColors.cyberLime; // LIME joints on perfect
-      case SkeletonState.error:
-        return AppColors.white70; // Keep white on error (no red)
+        return const Color(0xFFCCFF00); // Cyber Lime - full opacity
+      case SkeletonState.peak:
+        return const Color(0xFFFFD700); // Gold - achievement
+      case SkeletonState.success:
+        return const Color(0xFF00FF88); // Emerald Green
     }
   }
 
-  /// Get glow intensity based on skeleton state
-  /// Charging state increases glow with chargeProgress
+  /// Get glow intensity - builds with charge, max at peak/success
   double get _glowIntensity {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return 4.0;
+        return 4.0; // Subtle glow
       case SkeletonState.charging:
-        // Glow intensifies as user goes deeper: 4px → 12px
-        return 4.0 + (chargeProgress * 8.0);
-      case SkeletonState.perfect:
-        return 16.0; // MAXIMUM GLOW on perfect flash
-      case SkeletonState.error:
-        return 3.0; // Normal glow on error (no intense red glow)
+        // Glow intensifies as user goes deeper: 6px → 14px
+        return 6.0 + (chargeProgress * 8.0);
+      case SkeletonState.peak:
+        return 16.0; // MAXIMUM GLOW - achievement unlocked
+      case SkeletonState.success:
+        return 14.0; // Strong glow on success
     }
   }
 
-  /// Get line width based on state
+  /// Get line width - thickens as user descends
   double get _lineWidth {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return 3.0;
+        return 2.0;
       case SkeletonState.charging:
-        // Lines thicken from 3px → 6px as user goes deeper
-        return 3.0 + (chargeProgress * 3.0);
-      case SkeletonState.perfect:
-        return 6.0; // THICK for perfect flash
-      case SkeletonState.error:
-        return 3.0; // Normal width on error
+        // Lines thicken from 2px → 5px as user goes deeper
+        return 2.0 + (chargeProgress * 3.0);
+      case SkeletonState.peak:
+        return 5.0; // Thick at peak
+      case SkeletonState.success:
+        return 4.0;
     }
   }
 
@@ -172,21 +172,31 @@ class SkeletonPainter extends CustomPainter {
         canvas.drawLine(pos1, pos2, glowPaint);
         // Layer 2: Main line
         canvas.drawLine(pos1, pos2, linePaint);
-        // Layer 3: Inner core (only when charging or perfect)
-        if (skeletonState == SkeletonState.charging || 
-            skeletonState == SkeletonState.perfect) {
+        // Layer 3: Inner core (only when charging, peak, or success)
+        if (skeletonState == SkeletonState.charging ||
+            skeletonState == SkeletonState.peak ||
+            skeletonState == SkeletonState.success) {
           canvas.drawLine(pos1, pos2, corePaint);
         }
       }
     }
 
     // Helper to draw joint with glow
+    // JUICE: Joints GROW as user descends (charging state)
     void drawJoint(PoseLandmarkType type, {double sizeMultiplier = 1.0}) {
       final pos = getPosition(type);
       if (pos != null) {
-        final baseRadius = 6.0 + (chargeProgress * 2.0);
-        final radius = baseRadius * sizeMultiplier;
-        
+        double baseRadius = 6.0 * sizeMultiplier;
+        double radius = baseRadius;
+
+        if (skeletonState == SkeletonState.charging) {
+          // Expand joints by up to 50% at full depth
+          radius = baseRadius * (1.0 + (chargeProgress * 0.5));
+        } else if (skeletonState == SkeletonState.peak) {
+          // Max size at peak
+          radius = baseRadius * 1.5;
+        }
+
         // Outer glow
         canvas.drawCircle(pos, radius * 1.8, jointGlowPaint);
         // Core
