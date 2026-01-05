@@ -430,50 +430,50 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
           ),
           const SizedBox(height: 16),
 
-          // Exercise preview with animations
-          if (includedExercises.isNotEmpty)
-            Container(
-              height: 100,
-              margin: const EdgeInsets.only(bottom: 16),
-              child: Row(
-                children: includedExercises.take(4).map((ex) => 
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ExerciseAnimationWidget(
-                        exerciseId: ex.id,
-                        height: 100,
-                        fit: BoxFit.cover,
-                        borderRadius: BorderRadius.circular(12),
+          // Exercise list with animations (ONE PER EXERCISE)
+          ...includedExercises.map((ex) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                // Exercise Animation (left)
+                ExerciseAnimationWidget(
+                  exerciseId: ex.id,
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                const SizedBox(width: 12),
+                // Exercise Details (right)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ex.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                  )
-                ).toList(),
-              ),
-            ),
-
-          // Exercise text list (first 3)
-          ...includedExercises.take(3).map((ex) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              preset.isCircuit
-                  ? '• ${ex.name} - ${ex.timeSeconds}s / ${ex.restSeconds}s rest'
-                  : '• ${ex.name} - ${ex.sets}x${ex.reps}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.white60,
-              ),
+                      const SizedBox(height: 4),
+                      Text(
+                        preset.isCircuit
+                            ? '${ex.timeSeconds}s work / ${ex.restSeconds}s rest'
+                            : '${ex.sets} sets × ${ex.reps} reps',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.white60,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           )),
-          if (includedExercises.length > 3)
-            Text(
-              '+ ${includedExercises.length - 3} more...',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.white40,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
+
           const SizedBox(height: 20),
 
           // LOCK and EDIT buttons

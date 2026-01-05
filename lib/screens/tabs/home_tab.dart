@@ -416,10 +416,10 @@ class HomeTab extends ConsumerWidget {
                   color: AppColors.cyberLime,
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    // Navigate to train tab
+                    // Navigate to workouts tab
                     final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
                     if (navigator != null) {
-                      (navigator as dynamic).changeTab(1);
+                      (navigator as dynamic).changeTab(2); // Tab 2 = WORKOUTS
                     }
                   },
                 ),
@@ -621,7 +621,7 @@ class HomeTab extends ConsumerWidget {
         // Navigate to workouts tab
         final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
         if (navigator != null) {
-          (navigator as dynamic).changeTab(1);
+          (navigator as dynamic).changeTab(2); // Tab 2 = WORKOUTS
         }
       },
       child: Container(
@@ -715,7 +715,7 @@ class HomeTab extends ConsumerWidget {
                 onTap: () {
                   final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
                   if (navigator != null) {
-                    (navigator as dynamic).changeTab(1);
+                    (navigator as dynamic).changeTab(2); // Tab 2 = WORKOUTS
                   }
                 },
               ),
@@ -731,7 +731,7 @@ class HomeTab extends ConsumerWidget {
                   // Navigate to workouts tab (custom workout creation)
                   final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
                   if (navigator != null) {
-                    (navigator as dynamic).changeTab(1);
+                    (navigator as dynamic).changeTab(2); // Tab 2 = WORKOUTS
                   }
                   // TODO: Add deep link to custom workout creation
                   HapticFeedback.mediumImpact();
