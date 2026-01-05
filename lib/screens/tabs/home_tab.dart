@@ -111,9 +111,16 @@ class HomeTab extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Circular stats (VIRAL)
+                // Quick start buttons (MOVED UNDER STREAK)
                 SlideUpAnimation(
                   delay: 100,
+                  child: _buildQuickStartSection(context),
+                ),
+                const SizedBox(height: 20),
+
+                // Circular stats (VIRAL)
+                SlideUpAnimation(
+                  delay: 150,
                   child: _buildCircularStats(context, stats),
                 ),
                 const SizedBox(height: 20),
@@ -121,22 +128,15 @@ class HomeTab extends ConsumerWidget {
                 // Locked workout OR Create workout button
                 if (lockedWorkout != null) ...[
                   SlideUpAnimation(
-                    delay: 150,
+                    delay: 200,
                     child: _buildReadyToTrainCard(context, ref, lockedWorkout),
                   ),
                 ] else ...[
                   SlideUpAnimation(
-                    delay: 150,
+                    delay: 200,
                     child: _buildCreateWorkoutButton(context),
                   ),
                 ],
-                const SizedBox(height: 20),
-
-                // Quick start buttons
-                SlideUpAnimation(
-                  delay: 200,
-                  child: _buildQuickStartSection(context),
-                ),
                 const SizedBox(height: 20),
 
                 // Weekly progress bars (ANIMATED)
@@ -202,23 +202,30 @@ class HomeTab extends ConsumerWidget {
         GestureDetector(
           onTap: () {
             HapticFeedback.mediumImpact();
-            // Navigate to settings (tab 3)
-            final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-            if (navigator != null) {
-              (navigator as dynamic).changeTab(3);
-            }
+            // Show streak achievements modal (TODO)
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Streak achievements coming soon! 🔥'),
+                backgroundColor: AppColors.cyberLime,
+                duration: Duration(seconds: 2),
+              ),
+            );
           },
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.white5,
+              gradient: RadialGradient(
+                colors: [
+                  AppColors.neonCrimson.withOpacity(0.3),
+                  AppColors.neonCrimson.withOpacity(0.1),
+                ],
+              ),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.white10),
+              border: Border.all(color: AppColors.neonCrimson.withOpacity(0.5), width: 2),
             ),
-            child: const Icon(
-              Icons.settings,
-              color: AppColors.white70,
-              size: 20,
+            child: const Text(
+              '🔥',
+              style: TextStyle(fontSize: 24),
             ),
           ),
         ),
@@ -283,7 +290,7 @@ class HomeTab extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  hasStreak ? '🔥' : '💪',
+                  hasStreak ? '🔥' : '🔥',
                   style: const TextStyle(fontSize: 48),
                 ),
                 const SizedBox(width: 16),
@@ -398,40 +405,48 @@ class HomeTab extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              CircularStatRing(
-                current: stats.workoutsThisWeek,
-                target: 7,
-                label: 'WORKOUTS',
-                subtitle: '/ 7 days',
-                color: AppColors.cyberLime,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  // Navigate to train tab
-                  final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-                  if (navigator != null) {
-                    (navigator as dynamic).changeTab(1);
-                  }
-                },
+              Expanded(
+                child: CircularStatRing(
+                  current: stats.workoutsThisWeek,
+                  target: 7,
+                  label: 'WORKOUTS',
+                  subtitle: '/ 7 days',
+                  color: AppColors.cyberLime,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    // Navigate to train tab
+                    final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+                    if (navigator != null) {
+                      (navigator as dynamic).changeTab(1);
+                    }
+                  },
+                ),
               ),
-              CircularStatRing(
-                current: stats.repsThisWeek,
-                target: stats.repsThisWeek + 100,
-                label: 'TOTAL REPS',
-                color: AppColors.electricCyan,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                },
+              const SizedBox(width: 8),
+              Expanded(
+                child: CircularStatRing(
+                  current: stats.repsThisWeek,
+                  target: stats.repsThisWeek + 100,
+                  label: 'TOTAL REPS',
+                  color: AppColors.electricCyan,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                  },
+                ),
               ),
-              CircularStatRing(
-                current: (stats.repsThisWeek / 10).round(),
-                target: 100,
-                label: 'SETS',
-                color: AppColors.neonCrimson,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                },
+              const SizedBox(width: 8),
+              Expanded(
+                child: CircularStatRing(
+                  current: (stats.repsThisWeek / 10).round(),
+                  target: 100,
+                  label: 'SETS',
+                  color: AppColors.neonCrimson,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                  },
+                ),
               ),
             ],
           ),
@@ -709,11 +724,16 @@ class HomeTab extends ConsumerWidget {
             Expanded(
               child: _buildQuickStartButton(
                 context,
-                label: 'My\nProgress',
-                icon: Icons.analytics,
+                label: 'Custom\nWorkout',
+                icon: Icons.add_circle_outline,
                 color: AppColors.cyberLime,
                 onTap: () {
-                  // Show analytics modal or navigate
+                  // Navigate to workouts tab (custom workout creation)
+                  final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+                  if (navigator != null) {
+                    (navigator as dynamic).changeTab(1);
+                  }
+                  // TODO: Add deep link to custom workout creation
                   HapticFeedback.mediumImpact();
                 },
               ),
@@ -722,10 +742,11 @@ class HomeTab extends ConsumerWidget {
             Expanded(
               child: _buildQuickStartButton(
                 context,
-                label: 'History',
-                icon: Icons.history,
+                label: 'My\nProgress',
+                icon: Icons.analytics,
                 color: AppColors.neonCrimson,
                 onTap: () {
+                  // Show progress/analytics
                   HapticFeedback.mediumImpact();
                 },
               ),
