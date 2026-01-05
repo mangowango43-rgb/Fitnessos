@@ -210,6 +210,9 @@ class SquatPattern implements BasePattern {
     _state = RepState.ready;
     _feedback = "";
     _intentTimer = null;
+    _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
+    _smoothedPercentage = 100;
+    _currentPercentage = 100;
   }
 }
 

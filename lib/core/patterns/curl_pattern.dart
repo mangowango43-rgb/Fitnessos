@@ -185,6 +185,9 @@ class CurlPattern implements BasePattern {
     _state = RepState.ready;
     _feedback = "";
     _intentTimer = null;
+    _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
+    _smoothedCurlProgress = 0;
+    _curlProgress = 0;
   }
 }
 

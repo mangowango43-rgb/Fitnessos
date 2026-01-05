@@ -10,12 +10,10 @@ enum FormQuality {
   neutral, // Cyan - no exercise active / between reps
 }
 
-/// Dopamine HUD states - positive feedback only, no red/error
+/// Simplified skeleton states - clean 2-state system
 enum SkeletonState {
-  idle,      // Electric Blue - waiting, system ready
-  charging,  // Cyber Lime + Cyan glow - descending, building power
-  peak,      // Gold/Yellow - hit target depth, achievement unlocked
-  success,   // Emerald Green - rep counted, the big win
+  normal,   // White bones, black joints - default state
+  success,  // Blue bones, green joints - rep counted flash
 }
 
 /// CustomPainter that draws a glowing cyber-themed skeleton overlay
@@ -41,62 +39,41 @@ class SkeletonPainter extends CustomPainter {
     this.currentAngle,
   });
 
-  /// Get skeleton color based on SKELETON STATE
-  /// Dopamine ladder: Blue → Lime → Gold → Green
-  /// Colors made EXTRA vibrant and distinct for clear visual feedback
+  /// Bone color - simple 2-state system
   Color get _skeletonColor {
     switch (skeletonState) {
-      case SkeletonState.idle:
-        return const Color(0xFF00E0FF); // Bright Electric Blue
-      case SkeletonState.charging:
-        return const Color(0xFFAAFF00); // Bright Cyber Lime (more green, less yellow)
-      case SkeletonState.peak:
-        return const Color(0xFFFFAA00); // Bright Orange-Gold (distinct from lime)
+      case SkeletonState.normal:
+        return Colors.white;  // Clean white bones
       case SkeletonState.success:
-        return const Color(0xFF00FF66); // Vibrant Emerald Green
+        return const Color(0xFF00F0FF);  // Electric blue flash
     }
   }
 
-  /// Get joint color - matches skeleton state
-  /// Joints are brighter and more saturated than bones for pop
+  /// Joint color - simple 2-state system
   Color get _jointColor {
     switch (skeletonState) {
-      case SkeletonState.idle:
-        return const Color(0xFF00E0FF); // Bright Electric Blue
-      case SkeletonState.charging:
-        return const Color(0xFFAAFF00); // Bright Cyber Lime - full opacity
-      case SkeletonState.peak:
-        return const Color(0xFFFFAA00); // Bright Orange-Gold
+      case SkeletonState.normal:
+        return Colors.black.withOpacity(0.8);  // Shiny black joints
       case SkeletonState.success:
-        return const Color(0xFF00FF66); // Vibrant Emerald Green
+        return const Color(0xFF00FF88);  // Emerald green flash
     }
   }
 
-  /// Get glow intensity - builds with charge, max at peak/success
+  /// Glow intensity - subtle normally, strong on success
   double get _glowIntensity {
     switch (skeletonState) {
-      case SkeletonState.idle:
-        return 4.0; // Subtle glow
-      case SkeletonState.charging:
-        // Glow intensifies as user goes deeper: 6px → 14px
-        return 6.0 + (chargeProgress * 8.0);
-      case SkeletonState.peak:
-        return 16.0; // MAXIMUM GLOW - achievement unlocked
+      case SkeletonState.normal:
+        return 4.0;  // Subtle glow
       case SkeletonState.success:
-        return 14.0; // Strong glow on success
+        return 14.0;  // Strong glow on rep count
     }
   }
 
-  /// Get line width - thickens as user descends
+  /// Line width - consistent, slightly thicker on success
   double get _lineWidth {
     switch (skeletonState) {
-      case SkeletonState.idle:
-        return 2.0;
-      case SkeletonState.charging:
-        // Lines thicken from 2px → 5px as user goes deeper
-        return 2.0 + (chargeProgress * 3.0);
-      case SkeletonState.peak:
-        return 5.0; // Thick at peak
+      case SkeletonState.normal:
+        return 2.5;
       case SkeletonState.success:
         return 4.0;
     }
@@ -174,30 +151,18 @@ class SkeletonPainter extends CustomPainter {
         canvas.drawLine(pos1, pos2, glowPaint);
         // Layer 2: Main line
         canvas.drawLine(pos1, pos2, linePaint);
-        // Layer 3: Inner core (only when charging, peak, or success)
-        if (skeletonState == SkeletonState.charging ||
-            skeletonState == SkeletonState.peak ||
-            skeletonState == SkeletonState.success) {
+        // Layer 3: Inner core (only on success)
+        if (skeletonState == SkeletonState.success) {
           canvas.drawLine(pos1, pos2, corePaint);
         }
       }
     }
 
-    // Helper to draw joint with glow
-    // JUICE: Joints GROW as user descends (charging state)
-    void drawJoint(PoseLandmarkType type, {double sizeMultiplier = 1.0}) {
+    // Helper to draw joint with glow - FIXED sizes (no chargeProgress scaling)
+    void drawJoint(PoseLandmarkType type, {bool large = false}) {
       final pos = getPosition(type);
       if (pos != null) {
-        double baseRadius = 6.0 * sizeMultiplier;
-        double radius = baseRadius;
-
-        if (skeletonState == SkeletonState.charging) {
-          // Expand joints by up to 50% at full depth
-          radius = baseRadius * (1.0 + (chargeProgress * 0.5));
-        } else if (skeletonState == SkeletonState.peak) {
-          // Max size at peak
-          radius = baseRadius * 1.5;
-        }
+        final radius = large ? 12.0 : 8.0;  // Fixed sizes, no chargeProgress scaling
 
         // Outer glow
         canvas.drawCircle(pos, radius * 1.8, jointGlowPaint);
@@ -233,22 +198,22 @@ class SkeletonPainter extends CustomPainter {
     // === DRAW JOINTS - BODY ONLY, NO NOSE ===
 
     // Major joints (bigger)
-    drawJoint(PoseLandmarkType.leftShoulder, sizeMultiplier: 1.3);
-    drawJoint(PoseLandmarkType.rightShoulder, sizeMultiplier: 1.3);
-    drawJoint(PoseLandmarkType.leftHip, sizeMultiplier: 1.3);
-    drawJoint(PoseLandmarkType.rightHip, sizeMultiplier: 1.3);
+    drawJoint(PoseLandmarkType.leftShoulder, large: true);
+    drawJoint(PoseLandmarkType.rightShoulder, large: true);
+    drawJoint(PoseLandmarkType.leftHip, large: true);
+    drawJoint(PoseLandmarkType.rightHip, large: true);
 
     // Arm joints
     drawJoint(PoseLandmarkType.leftElbow);
     drawJoint(PoseLandmarkType.rightElbow);
-    drawJoint(PoseLandmarkType.leftWrist, sizeMultiplier: 0.8);
-    drawJoint(PoseLandmarkType.rightWrist, sizeMultiplier: 0.8);
+    drawJoint(PoseLandmarkType.leftWrist);
+    drawJoint(PoseLandmarkType.rightWrist);
 
     // Leg joints
-    drawJoint(PoseLandmarkType.leftKnee, sizeMultiplier: 1.1);
-    drawJoint(PoseLandmarkType.rightKnee, sizeMultiplier: 1.1);
-    drawJoint(PoseLandmarkType.leftAnkle, sizeMultiplier: 0.8);
-    drawJoint(PoseLandmarkType.rightAnkle, sizeMultiplier: 0.8);
+    drawJoint(PoseLandmarkType.leftKnee, large: true);
+    drawJoint(PoseLandmarkType.rightKnee, large: true);
+    drawJoint(PoseLandmarkType.leftAnkle);
+    drawJoint(PoseLandmarkType.rightAnkle);
 
     // NO NOSE. NO FACE. Just body.
 

@@ -59,7 +59,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   bool _isRecording = false;
 
   // GAMING FEATURES
-  SkeletonState _skeletonState = SkeletonState.idle;
+  SkeletonState _skeletonState = SkeletonState.normal;
   double _chargeProgress = 0.0;
   double _powerGaugeFill = 0.0;
   RepQuality? _lastRepQuality;
@@ -170,30 +170,17 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         // _feedback removed - voice coach handles feedback now
         _formScore = _session?.formScore ?? 0;
 
-        // DOPAMINE HUD: Update skeleton state based on rep phase
-        // IMPORTANT: Don't overwrite success state during rep flash animation!
+        // SIMPLE SKELETON: Always normal, flash success only on rep count
+        // The success flash is handled in onRepCounted callback
         if (!_showRepFlash) {
-          final repState = _session?.repState;
-          final chargeProgress = _session?.chargeProgress ?? 0.0;
-
-          if (repState == RepState.goingDown || repState == RepState.down) {
-            // Descending OR at bottom - CHARGING (lime, building power)
-            // Combined these states so lime shows for longer
-            _skeletonState = SkeletonState.charging;
-            _chargeProgress = chargeProgress;
-            _powerGaugeFill = chargeProgress;
-          } else if (repState == RepState.goingUp) {
-            // Ascending - PEAK (gold, holding power)
-            _skeletonState = SkeletonState.peak;
-            _powerGaugeFill = 1.0;
-          } else {
-            // Ready/idle - waiting for next rep
-            _skeletonState = SkeletonState.idle;
-            _chargeProgress = 0.0;
-            _powerGaugeFill = 0.0;
-          }
+          _skeletonState = SkeletonState.normal;
         }
-        // Note: SUCCESS state is handled in onRepCounted callback
+        // Note: _skeletonState = SkeletonState.success is set in onRepCounted
+
+        // Update power gauge fill based on charge progress
+        final chargeProgress = _session?.chargeProgress ?? 0.0;
+        _chargeProgress = chargeProgress;
+        _powerGaugeFill = chargeProgress;
       });
     } else {
       // Body lost
@@ -247,36 +234,18 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       setState(() {
         _showRepFlash = true;
         _formScore = score;
-
-        // DOPAMINE HUD: Flash skeleton to SUCCESS state (emerald green)
-        _skeletonState = SkeletonState.success;
+        _skeletonState = SkeletonState.success;  // Blue/green flash
       });
 
-      // JUICE: Heavy haptic on rep count - feel the win!
-      // Trigger haptic based on form score
-      if (score >= 85) {
-        // PERFECT REP - Heavy impact
-        print('📳 Triggering PERFECT haptic');
-        HapticHelper.perfectRepHaptic();
-      } else if (score >= 60) {
-        // GOOD REP - Medium impact
-        print('📳 Triggering GOOD haptic');
-        HapticHelper.goodRepHaptic();
-      } else {
-        // MISSED REP - Light impact (but still positive!)
-        print('📳 Triggering MISSED haptic');
-        HapticHelper.missedRepHaptic();
-      }
+      // Haptic feedback
+      HapticHelper.heavy();
 
-      // Hide flash and return to idle after animation
-      // Extended to 500ms so green flash is clearly visible
-      Future.delayed(const Duration(milliseconds: 500), () {
+      // Return to normal after 300ms
+      Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           setState(() {
             _showRepFlash = false;
-            _skeletonState = SkeletonState.idle;
-            _chargeProgress = 0.0;
-            _powerGaugeFill = 0.0;
+            _skeletonState = SkeletonState.normal;  // Back to white/black
           });
         }
       });
@@ -571,7 +540,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                     _cameraController!.value.previewSize!.width,
                   ),
                   isFrontCamera: true,
-                  skeletonState: SkeletonState.idle,
+                  skeletonState: SkeletonState.normal,
                   chargeProgress: 0.0,
                 ),
               ),
