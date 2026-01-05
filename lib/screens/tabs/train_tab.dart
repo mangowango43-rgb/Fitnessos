@@ -19,6 +19,7 @@ import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
 import '../../models/rep_quality.dart';
 import '../../providers/workout_provider.dart';
+import '../../providers/stats_provider.dart';
 
 // NEW: Import the rep counting system
 import '../../services/workout_session.dart';
@@ -473,6 +474,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _poseDetectorService = null;
     _session?.dispose();
     _session = null;
+
+    // Refresh stats provider to update home screen
+    ref.invalidate(workoutStatsProvider);
 
     setState(() {
       _isWorkoutActive = false;

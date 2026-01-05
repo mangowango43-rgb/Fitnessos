@@ -6,6 +6,7 @@ import '../../providers/stats_provider.dart';
 import '../../providers/workout_provider.dart';
 import '../../widgets/animated_counter.dart';
 import '../home_screen.dart' show TabNavigator;
+import '../tabs/settings_tab.dart';
 
 /// =============================================================================
 /// HOME TAB - STUNNING PROFESSIONAL FITNESS UI
@@ -143,44 +144,37 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildHeader(BuildContext context, WorkoutStats stats) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(12, 16, 20, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Left: Logo + App Name
           Row(
             children: [
-              // Logo
+              // Logo (BIGGER)
               Image.asset(
                 'assets/images/logo/playstore_icon.png',
-                width: 40,
-                height: 40,
+                width: 48,
+                height: 48,
               ),
               const SizedBox(width: 12),
-              // App Name
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.electricCyan, AppColors.cyberLime],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: const Text(
-                  'SKELETAL-PT',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                  ),
+              // App Name (LIME GREEN)
+              const Text(
+                'SKELETAL-PT',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.cyberLime,
+                  letterSpacing: 1.2,
                 ),
               ),
             ],
           ),
           
-          // Right: Streak Badge + Settings Icon
+          // Right: Streak Badge + Settings Icon (MORE SPACING)
           Row(
             children: [
-              // Streak Badge
+              // Streak Badge (NO RED BORDER)
               GestureDetector(
                 onTap: () {
                   HapticFeedback.mediumImpact();
@@ -195,16 +189,11 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.neonCrimson.withOpacity(0.3),
-                        AppColors.neonCrimson.withOpacity(0.1),
-                      ],
-                    ),
+                    color: AppColors.white10,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.neonCrimson.withOpacity(0.5),
-                      width: 1.5,
+                      color: AppColors.white20,
+                      width: 1,
                     ),
                   ),
                   child: Row(
@@ -224,17 +213,18 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 ),
               ),
               
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               
               // Settings Icon
               GestureDetector(
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  // Navigate to settings tab
-                  final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-                  if (navigator != null) {
-                    (navigator as dynamic).changeTab(3); // Settings tab
-                  }
+                  // Navigate to settings screen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsTab(),
+                    ),
+                  );
                 },
                 child: Container(
                   padding: const EdgeInsets.all(10),
@@ -261,11 +251,11 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DATE STRIP COMPONENT
+  // DATE STRIP COMPONENT (Smaller, like FutureYou)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildDateStrip() {
     return SizedBox(
-      height: 80,
+      height: 70,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -287,35 +277,19 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               HapticFeedback.selectionClick();
             },
             child: Container(
-              width: 60,
-              margin: const EdgeInsets.only(right: 12),
+              width: 50,
+              margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(
-                gradient: isSelected
-                    ? const LinearGradient(
-                        colors: [AppColors.electricCyan, AppColors.cyberLime],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      )
-                    : null,
-                color: isSelected ? null : AppColors.white5,
-                borderRadius: BorderRadius.circular(16),
+                color: isSelected 
+                    ? AppColors.cyberLime.withOpacity(0.15)
+                    : AppColors.white5,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isSelected
-                      ? AppColors.electricCyan
-                      : isToday
-                          ? AppColors.cyberLime.withOpacity(0.5)
-                          : AppColors.white10,
+                      ? AppColors.cyberLime
+                      : AppColors.white10,
                   width: isSelected ? 2 : 1,
                 ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.electricCyan.withOpacity(0.3),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : null,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -323,8 +297,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   Text(
                     ['S', 'M', 'T', 'W', 'T', 'F', 'S'][date.weekday % 7],
                     style: TextStyle(
-                      color: isSelected ? Colors.black : AppColors.white50,
-                      fontSize: 12,
+                      color: isSelected ? AppColors.cyberLime : AppColors.white50,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                     ),
@@ -333,21 +307,22 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   Text(
                     '${date.day}',
                     style: TextStyle(
-                      color: isSelected ? Colors.black : Colors.white,
-                      fontSize: 20,
+                      color: isSelected ? AppColors.cyberLime : Colors.white,
+                      fontSize: 18,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  if (isToday)
+                  if (isToday) ...[
+                    const SizedBox(height: 2),
                     Container(
-                      width: 6,
-                      height: 6,
+                      width: 4,
+                      height: 4,
                       decoration: BoxDecoration(
-                        color: isSelected ? Colors.black : AppColors.cyberLime,
+                        color: isSelected ? AppColors.cyberLime : AppColors.white50,
                         shape: BoxShape.circle,
                       ),
                     ),
+                  ],
                 ],
               ),
             ),

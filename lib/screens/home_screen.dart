@@ -34,14 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
     HomeTab(),
     TrainTab(),
     WorkoutsTab(),
-    SettingsTab(),
   ];
 
   final List<_TabInfo> _tabInfo = const [
     _TabInfo(icon: Icons.home, label: 'HOME'),
     _TabInfo(icon: Icons.videocam, label: 'TRAIN'),
     _TabInfo(icon: Icons.fitness_center, label: 'WORKOUTS'),
-    _TabInfo(icon: Icons.settings, label: 'SETTINGS'),
   ];
 
   @override
