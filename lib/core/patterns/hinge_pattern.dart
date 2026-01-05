@@ -181,6 +181,9 @@ class HingePattern implements BasePattern {
     _state = RepState.ready;
     _feedback = "";
     _intentTimer = null;
+    _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
+    _smoothedAngle = 180;
+    _currentAngle = 180;
   }
 }
 
