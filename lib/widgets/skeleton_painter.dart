@@ -34,7 +34,7 @@ class SkeletonPainter extends CustomPainter {
     required this.imageSize,
     this.isFrontCamera = true,
     this.formQuality = FormQuality.neutral,
-    this.skeletonState = SkeletonState.idle,
+    this.skeletonState = SkeletonState.normal,
     this.chargeProgress = 0.0,
     this.currentAngle,
   });

@@ -237,8 +237,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         _skeletonState = SkeletonState.success;  // Blue/green flash
       });
 
-      // Haptic feedback
-      HapticHelper.heavy();
+      // Haptic feedback - heavy impact for rep completion
+      HapticHelper.perfectRepHaptic();
 
       // Return to normal after 300ms
       Future.delayed(const Duration(milliseconds: 300), () {
