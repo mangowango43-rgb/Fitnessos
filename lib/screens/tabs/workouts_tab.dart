@@ -7,6 +7,7 @@ import '../../utils/app_colors.dart';
 import '../../utils/text_styles.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
+import '../../widgets/exercise_animation_widget.dart';
 import '../../providers/workout_provider.dart';
 import '../workout_editor_screen.dart';
 
@@ -429,7 +430,29 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
           ),
           const SizedBox(height: 16),
 
-          // Exercise preview (first 3)
+          // Exercise preview with animations
+          if (includedExercises.isNotEmpty)
+            Container(
+              height: 100,
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Row(
+                children: includedExercises.take(4).map((ex) => 
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ExerciseAnimationWidget(
+                        exerciseId: ex.id,
+                        height: 100,
+                        fit: BoxFit.cover,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  )
+                ).toList(),
+              ),
+            ),
+
+          // Exercise text list (first 3)
           ...includedExercises.take(3).map((ex) => Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(

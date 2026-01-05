@@ -13,6 +13,7 @@ import '../../widgets/shatter_animation.dart';
 import '../../widgets/tactical_countdown.dart';
 import '../../widgets/tactical_hud.dart';
 import '../../widgets/phone_position_guide.dart';
+import '../../widgets/exercise_animation_widget.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../models/workout_models.dart';
@@ -758,6 +759,32 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                     '${_lockedWorkout!.exercises.length} exercises • ~${_lockedWorkout!.estimatedMinutes} min',
                     style: const TextStyle(fontSize: 14, color: AppColors.white60),
                   ),
+                  const SizedBox(height: 24),
+                  
+                  // FIRST EXERCISE ANIMATION PREVIEW
+                  if (_lockedWorkout!.exercises.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Column(
+                        children: [
+                          Text(
+                            'FIRST EXERCISE',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.white50,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ExerciseAnimationPreview(
+                            exerciseId: _lockedWorkout!.exercises.first.id,
+                            exerciseName: _lockedWorkout!.exercises.first.name,
+                          ),
+                        ],
+                      ),
+                    ),
+                  
                   const SizedBox(height: 20),
                   
                   // Show which exercises have AI tracking
@@ -867,6 +894,15 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           left: 16,
           top: MediaQuery.of(context).size.height / 2 - 100, // Vertically centered
           child: PowerGauge(fillPercent: _powerGaugeFill),
+        ),
+
+        // EXERCISE ANIMATION PIP - Top right corner
+        Positioned(
+          top: 120,
+          right: 16,
+          child: ExerciseAnimationPIP(
+            exerciseId: exercise.id,
+          ),
         ),
 
         // GAMING: Shatter Animation - Full screen overlay
