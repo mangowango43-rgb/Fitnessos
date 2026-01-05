@@ -746,8 +746,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             children: [
               const SizedBox(height: 40), // Replace Spacer with fixed space
               GlassmorphismCard(
-              padding: const EdgeInsets.all(24),
-              child: Column(
+                padding: const EdgeInsets.all(24),
+                child: Column(
                 children: [
                   const Icon(Icons.lock, color: AppColors.cyberLime, size: 48),
                   const SizedBox(height: 16),
