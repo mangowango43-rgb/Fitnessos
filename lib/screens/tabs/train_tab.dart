@@ -748,7 +748,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
               GlassmorphismCard(
                 padding: const EdgeInsets.all(24),
                 child: Column(
-                children: [
+                  children: [
                   const Icon(Icons.lock, color: AppColors.cyberLime, size: 48),
                   const SizedBox(height: 16),
                   Text(
@@ -831,8 +831,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
                     ),
                   ),
                 ],
+                ),
               ),
-            ),
             const SizedBox(height: 24),
             GlowButton(
               text: '⚡ START WORKOUT',
