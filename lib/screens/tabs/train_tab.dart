@@ -157,19 +157,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         setState(() => _bodyDetected = bodyInFrame);
       }
       
-      // Start countdown when body first detected during countdown phase (before scanning/locked)
-      if (_showCountdown && bodyInFrame && !wasBodyDetected && !_isScanning && !_isLocked) {
-        _startCountdownTimer();
-      }
-      
-      // Reset countdown if body lost during countdown (before scanning)
-      if (_showCountdown && !bodyInFrame && wasBodyDetected && !_isScanning && !_isLocked) {
-        _countdownTimer?.cancel();
-        setState(() {
-          _countdownValue = 5; // Reset to 5
-          _hasSpokenExerciseName = false;
-        });
-      }
+      // Countdown runs automatically now - no body detection checks
+      // Body detection is only for skeleton overlay, not for countdown gating
       
       // Only process workout if countdown complete
       if (_countdownComplete && _isWorkoutActive && !_isResting) {
@@ -253,7 +242,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     // Step 2: Initialize camera
     await _initializeCamera();
     
-    // Step 3: Show countdown screen (waiting for body detection)
+    // Step 3: Show countdown screen and start immediately
     setState(() {
       _showCountdown = true;
       _countdownComplete = false;
@@ -263,10 +252,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _hasSpokenExerciseName = false;
     });
     
-    // If body already detected, start countdown immediately
-    if (_bodyDetected) {
-      _startCountdownTimer();
-    }
+    // Start countdown immediately - no waiting for body detection
+    _startCountdownTimer();
     
     // Initialize workout session
     _session = WorkoutSession();
@@ -351,9 +338,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       // _tts.speak('$exerciseName, get in your position');
       setState(() => _hasSpokenExerciseName = true);
       
-      // Wait 2 seconds before starting countdown
+      // Wait 2 seconds before starting countdown (no body detection check)
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted && _bodyDetected) {
+        if (mounted) {
           _startActualCountdown();
         }
       });
@@ -394,17 +381,10 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _isScanning = true;
     });
     
-    // Scanning for 2 seconds, then lock
+    // Scanning for 2 seconds, then lock (no body detection check)
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted && _bodyDetected) {
+      if (mounted) {
         _finishLockAndStartWorkout();
-      } else if (mounted) {
-        // Body lost during scanning, reset
-        setState(() {
-          _isScanning = false;
-          _countdownValue = 5; // Reset to 5
-          _hasSpokenExerciseName = false;
-        });
       }
     });
   }
