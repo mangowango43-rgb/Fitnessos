@@ -59,9 +59,9 @@ class SkeletonPainter extends CustomPainter {
   Color get _jointColor {
     switch (skeletonState) {
       case SkeletonState.idle:
-        return AppColors.electricCyan.withOpacity(0.7);
+        return AppColors.white70; // WHITE when idle (same as lines)
       case SkeletonState.charging:
-        return AppColors.electricCyan;
+        return AppColors.electricCyan; // BLUE when charging
       case SkeletonState.perfect:
         return AppColors.cyberLime; // LIME joints on perfect
       case SkeletonState.error:
