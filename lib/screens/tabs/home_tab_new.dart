@@ -77,7 +77,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             ref.invalidate(workoutStatsProvider);
           },
           color: AppColors.electricCyan,
-          backgroundColor: Colors.black,
+          backgroundColor: AppColors.deepSpace,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 100),
