@@ -738,12 +738,14 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     }
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const Spacer(),
-            GlassmorphismCard(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const SizedBox(height: 40), // Replace Spacer with fixed space
+              GlassmorphismCard(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
@@ -837,7 +839,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
               onPressed: _startWorkout,
               padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
             ),
-            const Spacer(),
+            const SizedBox(height: 40), // Replace Spacer with fixed space
           ],
         ),
       ),

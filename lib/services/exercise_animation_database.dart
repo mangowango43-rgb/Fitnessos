@@ -127,6 +127,36 @@ class ExerciseAnimationDatabase {
     'high_knees': 'https://fitnessprogramer.com/wp-content/uploads/2021/06/High-Knee-Skips.gif',
     'butt_kicks': 'https://fitnessprogramer.com/wp-content/uploads/2022/02/Butt-Kicks.gif',
     'wall_sits': 'https://fitnessprogramer.com/wp-content/uploads/2021/05/Wall-Sit.gif',
+    
+    // ========================================================================
+    // MISSING EXERCISES (ADDED)
+    // ========================================================================
+    'incline_press': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Incline-Bench-Press.gif',
+    'decline_press': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Decline-Bench-Press.gif',
+    'chest_flys': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Fly.gif',
+    'dips_chest': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Chest-Dips.gif',
+    'cable_crossover': 'https://fitnessprogramer.com/wp-content/uploads/2022/02/Cable-Crossover.gif',
+    'landmine_press': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/barbell-shoulder-press.gif',
+    'bent_rows': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Bent-Over-Row.gif',
+    'lat_pulldown': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Lat-Pulldown.gif',
+    'tbar_rows': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/T-Bar-Row-with-Handle.gif',
+    'reverse_flys': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Reverse-Fly.gif',
+    'rear_delt_flys': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Reverse-Fly.gif',
+    'pike_pushups': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Push-Up.gif',
+    'squats_bw': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Bodyweight-Squat.gif',
+    'bulgarian_split': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Bulgarian-Split-Squat.gif',
+    'overhead_tricep': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Overhead-Triceps-Extension.gif',
+    'close_grip_pushups': 'https://fitnessprogramer.com/wp-content/uploads/2022/02/Diamond-Push-up.gif',
+    'concentration_curls': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Curl.gif',
+    'planks': 'https://fitnessprogramer.com/wp-content/uploads/2022/09/Plank.gif',
+    'side_planks': 'https://fitnessprogramer.com/wp-content/uploads/2021/05/Side-Plank.gif',
+    'jump_rope': 'https://fitnessprogramer.com/wp-content/uploads/2021/02/Push-Up.gif',
+    'bear_crawls': 'https://fitnessprogramer.com/wp-content/uploads/2021/04/Burpee.gif',
+    'sprawls': 'https://fitnessprogramer.com/wp-content/uploads/2021/04/Burpee.gif',
+    'skaters': 'https://fitnessprogramer.com/wp-content/uploads/2021/06/High-Knee-Skips.gif',
+    'tuck_jumps': 'https://fitnessprogramer.com/wp-content/uploads/2021/09/Jump-Squat.gif',
+    'star_jumps': 'https://fitnessprogramer.com/wp-content/uploads/2021/06/Jumping-Jacks.gif',
+    'lateral_hops': 'https://fitnessprogramer.com/wp-content/uploads/2021/09/Box-Jump.gif',
   };
   
   /// Get animation URL for an exercise
