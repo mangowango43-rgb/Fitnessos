@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/exercise_animation_database.dart';
 import '../utils/app_colors.dart';
 
