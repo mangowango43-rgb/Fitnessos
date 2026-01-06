@@ -116,196 +116,246 @@ class WorkoutHistoryDB {
 
   /// Get total workouts completed
   Future<int> getTotalWorkouts() async {
-    final db = await database;
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM workout_sessions WHERE status = ?',
-      ['complete'],
-    );
-    return Sqflite.firstIntValue(result) ?? 0;
+    try {
+      final db = await database;
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM workout_sessions WHERE status = ?',
+        ['complete'],
+      );
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      print('Error getting total workouts: $e');
+      return 0;
+    }
   }
 
   /// Get current streak (consecutive days with workouts)
   Future<int> getCurrentStreak() async {
-    final db = await database;
-    
-    // Get all workout dates ordered by date descending
-    final result = await db.query(
-      'workout_sessions',
-      columns: ['date'],
-      where: 'status = ?',
-      whereArgs: ['complete'],
-      orderBy: 'date DESC',
-    );
+    try {
+      final db = await database;
 
-    if (result.isEmpty) return 0;
+      // Get all workout dates ordered by date descending
+      final result = await db.query(
+        'workout_sessions',
+        columns: ['date'],
+        where: 'status = ?',
+        whereArgs: ['complete'],
+        orderBy: 'date DESC',
+      );
 
-    int streak = 0;
-    DateTime? lastDate;
-    final today = DateTime.now();
+      if (result.isEmpty) return 0;
 
-    for (var row in result) {
-      final date = DateTime.parse(row['date'] as String);
-      final dateOnly = DateTime(date.year, date.month, date.day);
-      
-      if (lastDate == null) {
-        // First workout - check if it's today or yesterday
-        final todayOnly = DateTime(today.year, today.month, today.day);
-        final diff = todayOnly.difference(dateOnly).inDays;
-        
-        if (diff > 1) {
-          // Streak is broken (workout was more than 1 day ago)
-          return 0;
-        }
-        streak = 1;
-        lastDate = dateOnly;
-      } else {
-        // Check if consecutive day
-        final diff = lastDate.difference(dateOnly).inDays;
-        if (diff == 1) {
-          streak++;
+      int streak = 0;
+      DateTime? lastDate;
+      final today = DateTime.now();
+
+      for (var row in result) {
+        final date = DateTime.parse(row['date'] as String);
+        final dateOnly = DateTime(date.year, date.month, date.day);
+
+        if (lastDate == null) {
+          // First workout - check if it's today or yesterday
+          final todayOnly = DateTime(today.year, today.month, today.day);
+          final diff = todayOnly.difference(dateOnly).inDays;
+
+          if (diff > 1) {
+            // Streak is broken (workout was more than 1 day ago)
+            return 0;
+          }
+          streak = 1;
           lastDate = dateOnly;
         } else {
-          // Streak broken
-          break;
+          // Check if consecutive day
+          final diff = lastDate.difference(dateOnly).inDays;
+          if (diff == 1) {
+            streak++;
+            lastDate = dateOnly;
+          } else {
+            // Streak broken
+            break;
+          }
         }
       }
-    }
 
-    return streak;
+      return streak;
+    } catch (e) {
+      print('Error getting current streak: $e');
+      return 0;
+    }
   }
 
   /// Get longest streak ever
   Future<int> getLongestStreak() async {
-    final db = await database;
-    
-    final result = await db.query(
-      'workout_sessions',
-      columns: ['date'],
-      where: 'status = ?',
-      whereArgs: ['complete'],
-      orderBy: 'date ASC',
-    );
+    try {
+      final db = await database;
 
-    if (result.isEmpty) return 0;
+      final result = await db.query(
+        'workout_sessions',
+        columns: ['date'],
+        where: 'status = ?',
+        whereArgs: ['complete'],
+        orderBy: 'date ASC',
+      );
 
-    int longestStreak = 0;
-    int currentStreak = 0;
-    DateTime? lastDate;
+      if (result.isEmpty) return 0;
 
-    for (var row in result) {
-      final date = DateTime.parse(row['date'] as String);
-      final dateOnly = DateTime(date.year, date.month, date.day);
-      
-      if (lastDate == null) {
-        currentStreak = 1;
-      } else {
-        final diff = dateOnly.difference(lastDate).inDays;
-        if (diff == 1) {
-          currentStreak++;
-        } else {
-          longestStreak = currentStreak > longestStreak ? currentStreak : longestStreak;
+      int longestStreak = 0;
+      int currentStreak = 0;
+      DateTime? lastDate;
+
+      for (var row in result) {
+        final date = DateTime.parse(row['date'] as String);
+        final dateOnly = DateTime(date.year, date.month, date.day);
+
+        if (lastDate == null) {
           currentStreak = 1;
+        } else {
+          final diff = dateOnly.difference(lastDate).inDays;
+          if (diff == 1) {
+            currentStreak++;
+          } else {
+            longestStreak = currentStreak > longestStreak ? currentStreak : longestStreak;
+            currentStreak = 1;
+          }
         }
-      }
-      
-      lastDate = dateOnly;
-    }
 
-    return currentStreak > longestStreak ? currentStreak : longestStreak;
+        lastDate = dateOnly;
+      }
+
+      return currentStreak > longestStreak ? currentStreak : longestStreak;
+    } catch (e) {
+      print('Error getting longest streak: $e');
+      return 0;
+    }
   }
 
   /// Get total reps this week
   Future<int> getTotalRepsThisWeek() async {
-    final db = await database;
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final weekStartStr = DateTime(weekStart.year, weekStart.month, weekStart.day).toIso8601String();
+    try {
+      final db = await database;
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekStartStr = DateTime(weekStart.year, weekStart.month, weekStart.day).toIso8601String();
 
-    final result = await db.rawQuery(
-      'SELECT SUM(total_reps) as total FROM workout_sessions WHERE date >= ? AND status = ?',
-      [weekStartStr, 'complete'],
-    );
+      final result = await db.rawQuery(
+        'SELECT SUM(total_reps) as total FROM workout_sessions WHERE date >= ? AND status = ?',
+        [weekStartStr, 'complete'],
+      );
 
-    return Sqflite.firstIntValue(result) ?? 0;
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      print('Error getting total reps this week: $e');
+      return 0;
+    }
   }
 
   /// Get total reps last week
   Future<int> getTotalRepsLastWeek() async {
-    final db = await database;
-    final now = DateTime.now();
-    final lastWeekEnd = now.subtract(Duration(days: now.weekday));
-    final lastWeekStart = lastWeekEnd.subtract(const Duration(days: 6));
-    
-    final startStr = DateTime(lastWeekStart.year, lastWeekStart.month, lastWeekStart.day).toIso8601String();
-    final endStr = DateTime(lastWeekEnd.year, lastWeekEnd.month, lastWeekEnd.day).toIso8601String();
+    try {
+      final db = await database;
+      final now = DateTime.now();
+      final lastWeekEnd = now.subtract(Duration(days: now.weekday));
+      final lastWeekStart = lastWeekEnd.subtract(const Duration(days: 6));
 
-    final result = await db.rawQuery(
-      'SELECT SUM(total_reps) as total FROM workout_sessions WHERE date >= ? AND date < ? AND status = ?',
-      [startStr, endStr, 'complete'],
-    );
+      final startStr = DateTime(lastWeekStart.year, lastWeekStart.month, lastWeekStart.day).toIso8601String();
+      final endStr = DateTime(lastWeekEnd.year, lastWeekEnd.month, lastWeekEnd.day).toIso8601String();
 
-    return Sqflite.firstIntValue(result) ?? 0;
+      final result = await db.rawQuery(
+        'SELECT SUM(total_reps) as total FROM workout_sessions WHERE date >= ? AND date < ? AND status = ?',
+        [startStr, endStr, 'complete'],
+      );
+
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      print('Error getting total reps last week: $e');
+      return 0;
+    }
   }
 
   /// Get workouts completed this week
   Future<int> getWorkoutsThisWeek() async {
-    final db = await database;
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final weekStartStr = DateTime(weekStart.year, weekStart.month, weekStart.day).toIso8601String();
+    try {
+      final db = await database;
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekStartStr = DateTime(weekStart.year, weekStart.month, weekStart.day).toIso8601String();
 
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM workout_sessions WHERE date >= ? AND status = ?',
-      [weekStartStr, 'complete'],
-    );
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM workout_sessions WHERE date >= ? AND status = ?',
+        [weekStartStr, 'complete'],
+      );
 
-    return Sqflite.firstIntValue(result) ?? 0;
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      print('Error getting workouts this week: $e');
+      return 0;
+    }
   }
 
   /// Get total training time (all time)
   Future<int> getTotalTrainingMinutes() async {
-    final db = await database;
-    final result = await db.rawQuery(
-      'SELECT SUM(duration_minutes) as total FROM workout_sessions WHERE status = ?',
-      ['complete'],
-    );
-    return Sqflite.firstIntValue(result) ?? 0;
+    try {
+      final db = await database;
+      final result = await db.rawQuery(
+        'SELECT SUM(duration_minutes) as total FROM workout_sessions WHERE status = ?',
+        ['complete'],
+      );
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      print('Error getting total training minutes: $e');
+      return 0;
+    }
   }
 
   /// Get total lifetime reps
   Future<int> getTotalLifetimeReps() async {
-    final db = await database;
-    final result = await db.rawQuery(
-      'SELECT SUM(total_reps) as total FROM workout_sessions WHERE status = ?',
-      ['complete'],
-    );
-    return Sqflite.firstIntValue(result) ?? 0;
+    try {
+      final db = await database;
+      final result = await db.rawQuery(
+        'SELECT SUM(total_reps) as total FROM workout_sessions WHERE status = ?',
+        ['complete'],
+      );
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      print('Error getting total lifetime reps: $e');
+      return 0;
+    }
   }
 
   /// Get average form score (last 10 workouts)
   Future<double> getAverageFormScore() async {
-    final db = await database;
-    final result = await db.rawQuery(
-      'SELECT AVG(avg_form_score) as avg FROM (SELECT avg_form_score FROM workout_sessions WHERE status = ? ORDER BY date DESC LIMIT 10)',
-      ['complete'],
-    );
-    return (result.first['avg'] as double?) ?? 0.0;
+    try {
+      final db = await database;
+      final result = await db.rawQuery(
+        'SELECT AVG(avg_form_score) as avg FROM (SELECT avg_form_score FROM workout_sessions WHERE status = ? ORDER BY date DESC LIMIT 10)',
+        ['complete'],
+      );
+      return (result.first['avg'] as double?) ?? 0.0;
+    } catch (e) {
+      print('Error getting average form score: $e');
+      return 0.0;
+    }
   }
 
   /// Get last workout date
   Future<DateTime?> getLastWorkoutDate() async {
-    final db = await database;
-    final result = await db.query(
-      'workout_sessions',
-      columns: ['date'],
-      where: 'status = ?',
-      whereArgs: ['complete'],
-      orderBy: 'date DESC',
-      limit: 1,
-    );
+    try {
+      final db = await database;
+      final result = await db.query(
+        'workout_sessions',
+        columns: ['date'],
+        where: 'status = ?',
+        whereArgs: ['complete'],
+        orderBy: 'date DESC',
+        limit: 1,
+      );
 
-    if (result.isEmpty) return null;
-    return DateTime.parse(result.first['date'] as String);
+      if (result.isEmpty) return null;
+      return DateTime.parse(result.first['date'] as String);
+    } catch (e) {
+      print('Error getting last workout date: $e');
+      return null;
+    }
   }
 
   /// Get recent workout sessions (for history list)

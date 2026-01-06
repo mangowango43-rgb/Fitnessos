@@ -33,113 +33,129 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   Widget build(BuildContext context) {
     final statsAsync = ref.watch(workoutStatsProvider);
     final lockedWorkout = ref.watch(lockedWorkoutProvider);
-    
+
+    // Get stats - use previous value while loading to prevent grey flash
+    final stats = statsAsync.valueOrNull ?? WorkoutStats.empty();
+    final isLoading = statsAsync.isLoading;
+    final hasError = statsAsync.hasError;
+
     return SafeArea(
-      child: statsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.electricCyan),
-          ),
-        ),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: AppColors.neonCrimson, size: 64),
-              const SizedBox(height: 16),
-              const Text(
-                'Error loading stats',
-                style: TextStyle(color: AppColors.white60, fontSize: 16),
-              ),
-              const SizedBox(height: 24),
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  ref.invalidate(workoutStatsProvider);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.electricCyan,
-                    borderRadius: BorderRadius.circular(12),
+      child: hasError
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.neonCrimson, size: 64),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Error loading stats',
+                    style: TextStyle(color: AppColors.white60, fontSize: 16),
                   ),
-                  child: const Text(
-                    'RETRY',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 14,
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      ref.invalidate(workoutStatsProvider);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.electricCyan,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'RETRY',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
-        data: (stats) => RefreshIndicator(
-          onRefresh: () async {
-            HapticFeedback.mediumImpact();
-            ref.invalidate(workoutStatsProvider);
-          },
-          color: AppColors.electricCyan,
-          backgroundColor: Colors.black,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ═══════════════════════════════════════════════
-                // HEADER: Logo + App Name + Streak + Settings
-                // ═══════════════════════════════════════════════
-                _buildHeader(context, stats),
-                
-                const SizedBox(height: 16),
-                
-                // ═══════════════════════════════════════════════
-                // DATE STRIP: Horizontal scrollable week view
-                // ═══════════════════════════════════════════════
-                _buildDateStrip(),
-                
-                const SizedBox(height: 20),
-                
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      // ═══════════════════════════════════════════════
-                      // HERO WORKOUT CARD: Today's scheduled workout
-                      // ═══════════════════════════════════════════════
-                      _buildHeroWorkoutCard(context, ref, lockedWorkout),
-                      
-                      const SizedBox(height: 20),
-                      
-                      // ═══════════════════════════════════════════════
-                      // STAT CARDS: 2x2 grid (Workouts, Reps, Sets, Streak)
-                      // ═══════════════════════════════════════════════
-                      _buildStatCardsGrid(stats),
-                      
-                      const SizedBox(height: 20),
-                      
-                      // ═══════════════════════════════════════════════
-                      // QUICK ACTIONS: Browse Workouts + Create Custom
-                      // ═══════════════════════════════════════════════
-                      _buildQuickActionsRow(context),
-                      
-                      const SizedBox(height: 20),
-                      
-                      // ═══════════════════════════════════════════════
-                      // RECOVERY STATUS: Muscle group readiness
-                      // ═══════════════════════════════════════════════
-                      _buildRecoveryStatusCard(stats),
-                    ],
+            )
+          : RefreshIndicator(
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                ref.invalidate(workoutStatsProvider);
+              },
+              color: AppColors.electricCyan,
+              backgroundColor: Colors.black,
+              child: Stack(
+                children: [
+                  // Main content - always show even while loading
+                  SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 100),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ═══════════════════════════════════════════════
+                        // HEADER: Logo + App Name + Streak + Settings
+                        // ═══════════════════════════════════════════════
+                        _buildHeader(context, stats),
+
+                        const SizedBox(height: 16),
+
+                        // ═══════════════════════════════════════════════
+                        // DATE STRIP: Horizontal scrollable week view
+                        // ═══════════════════════════════════════════════
+                        _buildDateStrip(),
+
+                        const SizedBox(height: 20),
+
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            children: [
+                              // ═══════════════════════════════════════════════
+                              // HERO WORKOUT CARD: Today's scheduled workout
+                              // ═══════════════════════════════════════════════
+                              _buildHeroWorkoutCard(context, ref, lockedWorkout),
+
+                              const SizedBox(height: 20),
+
+                              // ═══════════════════════════════════════════════
+                              // STAT CARDS: 2x2 grid (Workouts, Reps, Sets, Streak)
+                              // ═══════════════════════════════════════════════
+                              _buildStatCardsGrid(stats),
+
+                              const SizedBox(height: 20),
+
+                              // ═══════════════════════════════════════════════
+                              // QUICK ACTIONS: Browse Workouts + Create Custom
+                              // ═══════════════════════════════════════════════
+                              _buildQuickActionsRow(context),
+
+                              const SizedBox(height: 20),
+
+                              // ═══════════════════════════════════════════════
+                              // RECOVERY STATUS: Muscle group readiness
+                              // ═══════════════════════════════════════════════
+                              _buildRecoveryStatusCard(stats),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  // Optional: Show subtle loading indicator at top while refreshing
+                  if (isLoading)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: LinearProgressIndicator(
+                        backgroundColor: Colors.transparent,
+                        valueColor: AlwaysStoppedAnimation(AppColors.electricCyan.withOpacity(0.5)),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
