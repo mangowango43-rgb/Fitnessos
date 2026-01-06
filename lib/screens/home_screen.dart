@@ -18,24 +18,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late int _currentIndex;
   final ValueNotifier<bool> _hideBottomNav = ValueNotifier<bool>(false);
-  
-  // Cache tabs to prevent unnecessary rebuilds
-  late final List<Widget> _tabs;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialTab;
-    
-    // Initialize tabs once - prevents grey flash on provider updates
-    _tabs = [
-      const HomeTab(key: ValueKey('home_tab')),
-      TrainTab(key: const ValueKey('train_tab'), onWorkoutStateChanged: (isActive) {
-        _hideBottomNav.value = isActive;
-      }),
-      const WorkoutsTab(key: ValueKey('workouts_tab')),
-      const ProfileTab(key: ValueKey('profile_tab')),
-    ];
   }
 
   @override
@@ -59,15 +46,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Create tabs dynamically so they rebuild with provider changes
+    final tabs = [
+      const HomeTab(),
+      TrainTab(onWorkoutStateChanged: (isActive) {
+        _hideBottomNav.value = isActive;
+      }),
+      const WorkoutsTab(),
+      const ProfileTab(),
+    ];
+
     return CyberGridBackground(
       child: TabNavigator(
         changeTab: changeTab,
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: IndexedStack(
-            index: _currentIndex,
-            children: _tabs,
-          ),
+          body: tabs[_currentIndex],
           bottomNavigationBar: ValueListenableBuilder<bool>(
             valueListenable: _hideBottomNav,
             builder: (context, hideNav, child) {
