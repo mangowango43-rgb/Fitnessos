@@ -5,6 +5,8 @@ class AppColors {
   static const cyberLime = Color(0xFFCCFF00); // #CCFF00
   static const electricCyan = Color(0xFF00F0FF); // #00F0FF
   static const neonCrimson = Color(0xFFFF003C); // #FF003C
+  static const neonPurple = Color(0xFFBF40FF); // #BF40FF
+  static const neonOrange = Color(0xFFFF8C00); // #FF8C00
   static const cyberBlack = Color(0xFF000000); // #000000
 
   // Gradient backgrounds
