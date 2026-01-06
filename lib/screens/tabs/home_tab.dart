@@ -1212,8 +1212,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.deepSpace,
-              AppColors.deepSpace.withOpacity(0.95),
+              AppColors.cyberBlack,
+              AppColors.cyberBlack.withOpacity(0.95),
             ],
           ),
           borderRadius: const BorderRadius.only(
@@ -1354,8 +1354,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.deepSpace,
-              AppColors.deepSpace.withOpacity(0.95),
+              AppColors.cyberBlack,
+              AppColors.cyberBlack.withOpacity(0.95),
             ],
           ),
           borderRadius: const BorderRadius.only(
@@ -1433,8 +1433,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 itemCount: _streakAchievements.length,
                 itemBuilder: (context, index) {
                   final achievement = _streakAchievements[index];
-                  final isUnlocked = stats.currentStreak >= achievement['days'] as int;
-                  
+                  final isUnlocked = stats.currentStreak >= (achievement['days'] as int);
+
                   return TweenAnimationBuilder(
                     duration: Duration(milliseconds: 300 + (index * 50)),
                     tween: Tween<double>(begin: 0, end: 1),
