@@ -261,14 +261,14 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
       ),
       _StatItem(
         label: 'TOTAL REPS',
-        value: stats.totalReps.toString(),
+        value: stats.totalLifetimeReps.toString(),
         icon: Icons.repeat,
         color: AppColors.cyberLime,
       ),
       _StatItem(
-        label: 'TOTAL SETS',
-        value: stats.totalSets.toString(),
-        icon: Icons.layers,
+        label: 'TRAINING TIME',
+        value: stats.formattedTrainingTime,
+        icon: Icons.timer,
         color: AppColors.neonPurple,
       ),
       _StatItem(
