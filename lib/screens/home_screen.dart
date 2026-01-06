@@ -18,11 +18,24 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late int _currentIndex;
   final ValueNotifier<bool> _hideBottomNav = ValueNotifier<bool>(false);
+  
+  // Cache tabs to prevent unnecessary rebuilds
+  late final List<Widget> _tabs;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialTab;
+    
+    // Initialize tabs once - prevents grey flash on provider updates
+    _tabs = [
+      const HomeTab(key: ValueKey('home_tab')),
+      TrainTab(key: const ValueKey('train_tab'), onWorkoutStateChanged: (isActive) {
+        _hideBottomNav.value = isActive;
+      }),
+      const WorkoutsTab(key: ValueKey('workouts_tab')),
+      const ProfileTab(key: ValueKey('profile_tab')),
+    ];
   }
 
   @override
@@ -46,26 +59,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Create tabs with hideBottomNav callback
-    final tabs = [
-      const HomeTab(key: ValueKey('home_tab')),
-      TrainTab(key: const ValueKey('train_tab'), onWorkoutStateChanged: (isActive) {
-        _hideBottomNav.value = isActive;
-      }),
-      const WorkoutsTab(key: ValueKey('workouts_tab')),
-      const ProfileTab(key: ValueKey('profile_tab')),
-    ];
-
     return CyberGridBackground(
       child: TabNavigator(
         changeTab: changeTab,
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            switchInCurve: Curves.easeInOut,
-            switchOutCurve: Curves.easeInOut,
-            child: tabs[_currentIndex],
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _tabs,
           ),
           bottomNavigationBar: ValueListenableBuilder<bool>(
             valueListenable: _hideBottomNav,
