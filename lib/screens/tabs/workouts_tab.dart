@@ -10,6 +10,7 @@ import '../../widgets/glow_button.dart';
 import '../../widgets/exercise_animation_widget.dart';
 import '../../providers/workout_provider.dart';
 import '../workout_editor_screen.dart';
+import '../home_screen.dart' show TabNavigator;
 
 class WorkoutsTab extends ConsumerStatefulWidget {
   const WorkoutsTab({super.key});
@@ -577,6 +578,12 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
           duration: const Duration(seconds: 2),
         ),
       );
+      
+      // Navigate to home tab to show the locked workout in hero card
+      final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+      if (navigator != null) {
+        (navigator as dynamic).changeTab(0); // Home tab
+      }
     }
   }
 

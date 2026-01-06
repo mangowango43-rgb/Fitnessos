@@ -129,7 +129,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                               // ═══════════════════════════════════════════════
                               _buildQuickActionsRow(context),
 
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 77), // Pushed down by 1.5cm (~57px) from original 20
 
                               // ═══════════════════════════════════════════════
                               // RECOVERY STATUS: Muscle group readiness

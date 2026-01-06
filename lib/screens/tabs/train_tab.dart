@@ -1128,9 +1128,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // REP COUNTER - Bottom Right (moved from top)
+        // REP COUNTER - Bottom Right (same level as record and finish buttons)
         Positioned(
-          bottom: 100, // Above the FINISH button
+          bottom: 39, // Same level as record and finish buttons (was 100)
           right: 20,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -1227,9 +1227,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // Record button - Bottom Left (pushed down to nav bar area)
+        // Record button - Bottom Left (pushed up by 0.5cm / ~19px)
         Positioned(
-          bottom: 20,
+          bottom: 39, // Was 20, now 39 (pushed up by ~0.5cm)
           left: 20,
           child: GestureDetector(
             onTap: () async {
@@ -1260,9 +1260,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // Bottom center button (FINISH - half size, pushed down)
+        // Bottom center button (FINISH - pushed up by 0.5cm / ~19px)
         Positioned(
-          bottom: 20,
+          bottom: 39, // Was 20, now 39 (pushed up by ~0.5cm)
           left: 0,
           right: 0,
           child: Center(

@@ -48,12 +48,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     // Create tabs with hideBottomNav callback
     final tabs = [
-      const HomeTab(),
-      TrainTab(onWorkoutStateChanged: (isActive) {
+      const HomeTab(key: ValueKey('home_tab')),
+      TrainTab(key: const ValueKey('train_tab'), onWorkoutStateChanged: (isActive) {
         _hideBottomNav.value = isActive;
       }),
-      const WorkoutsTab(),
-      const ProfileTab(),
+      const WorkoutsTab(key: ValueKey('workouts_tab')),
+      const ProfileTab(key: ValueKey('profile_tab')),
     ];
 
     return CyberGridBackground(
@@ -62,7 +62,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeInOut,
+            switchOutCurve: Curves.easeInOut,
             child: tabs[_currentIndex],
           ),
           bottomNavigationBar: ValueListenableBuilder<bool>(
