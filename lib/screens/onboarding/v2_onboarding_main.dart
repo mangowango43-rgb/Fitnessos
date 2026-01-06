@@ -297,48 +297,45 @@ class _V2OnboardingMainState extends ConsumerState<V2OnboardingMain> {
     ];
 
     return _OnboardingScreenTemplate(
-      child: Column(
-        children: [
-          const SizedBox(height: 100),
-          const Text(
-            'Who are you training\nto become?',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              height: 1.2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          children: [
+            const SizedBox(height: 60),
+            const Text(
+              'Who are you training\nto become?',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                height: 1.2,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 40),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: goals.length,
-              itemBuilder: (context, index) {
-                final goal = goals[index];
-                final isSelected = _selectedGoal == goal['id'];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _buildSelectableCard(
-                    emoji: goal['emoji']!,
-                    title: goal['title']!,
-                    subtitle: goal['subtitle']!,
-                    isSelected: isSelected,
-                    onTap: () {
-                      setState(() => _selectedGoal = goal['id']);
-                    },
-                  ),
-                );
-              },
+            const SizedBox(height: 40),
+            // Use Column instead of ListView for better layout
+            ...goals.map((goal) {
+              final isSelected = _selectedGoal == goal['id'];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildSelectableCard(
+                  emoji: goal['emoji']!,
+                  title: goal['title']!,
+                  subtitle: goal['subtitle']!,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() => _selectedGoal = goal['id']);
+                  },
+                ),
+              );
+            }),
+            const SizedBox(height: 40),
+            _buildPrimaryButton(
+              text: 'Continue',
+              onPressed: _selectedGoal != null ? _nextPage : null,
             ),
-          ),
-          _buildPrimaryButton(
-            text: 'Continue',
-            onPressed: _selectedGoal != null ? _nextPage : null,
-          ),
-          const SizedBox(height: 32),
-        ],
+          ],
+        ),
       ),
     );
   }
