@@ -27,7 +27,9 @@ import '../../services/workout_session.dart';
 import '../../core/patterns/movement_engine.dart';
 
 class TrainTab extends ConsumerStatefulWidget {
-  const TrainTab({super.key});
+  final Function(bool isActive)? onWorkoutStateChanged;
+  
+  const TrainTab({super.key, this.onWorkoutStateChanged});
 
   @override
   ConsumerState<TrainTab> createState() => _TrainTabState();
@@ -277,6 +279,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _isWorkoutActive = true;
       _currentExerciseIndex = 0;
     });
+    
+    // Notify parent to hide bottom nav
+    widget.onWorkoutStateChanged?.call(true);
 
     // Exercise will start after countdown completes in _finishLockAndStartWorkout
   }
@@ -477,6 +482,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _poseDetectorService = null;
     _session?.dispose();
     _session = null;
+
+    // Notify parent to show bottom nav
+    widget.onWorkoutStateChanged?.call(false);
 
     // Refresh stats provider to update home screen
     ref.invalidate(workoutStatsProvider);
@@ -964,17 +972,17 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
             ),
           ),
 
-        // GAMING: Power Gauge - Left edge
+        // GAMING: Power Gauge - Left edge, below angle counter
         Positioned(
           left: 16,
-          top: MediaQuery.of(context).size.height / 2 - 100, // Vertically centered
+          top: 220, // Below angle counter (was vertically centered)
           child: PowerGauge(fillPercent: _powerGaugeFill),
         ),
 
-        // EXERCISE ANIMATION PIP - Top right corner
+        // EXERCISE ANIMATION PIP - Left side, above power gauge (rep meter)
         Positioned(
-          top: 120,
-          right: 16,
+          top: 180, // Just under the angle counter
+          left: 16, // Stuck to left of screen
           child: ExerciseAnimationPIP(
             exerciseId: exercise.id,
           ),
@@ -1119,10 +1127,10 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // REP COUNTER - Top Right (compact)
+        // REP COUNTER - Bottom Right (moved from top)
         Positioned(
-          top: 120,
-          right: 16,
+          bottom: 100, // Above the FINISH button
+          right: 20,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
@@ -1218,9 +1226,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // Record button - Bottom Left
+        // Record button - Bottom Left (pushed down to nav bar area)
         Positioned(
-          bottom: 40,
+          bottom: 20,
           left: 20,
           child: GestureDetector(
             onTap: () async {
@@ -1251,23 +1259,23 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // Bottom center button
+        // Bottom center button (FINISH - half size, pushed down)
         Positioned(
-          bottom: 40,
+          bottom: 20,
           left: 0,
           right: 0,
           child: Center(
             child: GestureDetector(
               onTap: _finishSet,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.cyberLime,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
                   'FINISH SET',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.black, letterSpacing: 1),
                 ),
               ),
             ),

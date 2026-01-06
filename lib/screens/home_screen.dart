@@ -17,6 +17,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late int _currentIndex;
+  final ValueNotifier<bool> _hideBottomNav = ValueNotifier<bool>(false);
 
   @override
   void initState() {
@@ -24,18 +25,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _currentIndex = widget.initialTab;
   }
 
+  @override
+  void dispose() {
+    _hideBottomNav.dispose();
+    super.dispose();
+  }
+
   void changeTab(int index) {
     setState(() {
       _currentIndex = index;
     });
   }
-
-  final List<Widget> _tabs = const [
-    HomeTab(),
-    TrainTab(),
-    WorkoutsTab(),
-    ProfileTab(),
-  ];
 
   final List<_TabInfo> _tabInfo = const [
     _TabInfo(icon: Icons.home, label: 'HOME'),
@@ -46,6 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Create tabs with hideBottomNav callback
+    final tabs = [
+      const HomeTab(),
+      TrainTab(onWorkoutStateChanged: (isActive) {
+        _hideBottomNav.value = isActive;
+      }),
+      const WorkoutsTab(),
+      const ProfileTab(),
+    ];
+
     return CyberGridBackground(
       child: TabNavigator(
         changeTab: changeTab,
@@ -53,16 +63,27 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.transparent,
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: _tabs[_currentIndex],
+            child: tabs[_currentIndex],
           ),
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.95),
-              border: const Border(
-                top: BorderSide(color: AppColors.white10, width: 1),
+          bottomNavigationBar: ValueListenableBuilder<bool>(
+            valueListenable: _hideBottomNav,
+            builder: (context, hideNav, child) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: hideNav ? 0 : null,
+                child: hideNav 
+                    ? const SizedBox.shrink()
+                    : child,
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.95),
+                border: const Border(
+                  top: BorderSide(color: AppColors.white10, width: 1),
+                ),
               ),
-            ),
-            child: SafeArea(
+              child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
