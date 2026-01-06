@@ -358,9 +358,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       return _buildNoWorkoutCard(context);
     }
 
-    // Get first 5 exercises for GIF preview
-    final exercises = lockedWorkout.exercises.take(5).toList();
-
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
@@ -467,15 +464,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                     ],
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   
-                  // Exercise GIF Previews (5 squares)
+                  // Workout Details Cards (removed GIFs, added info cards)
                   Row(
-                    children: exercises.map((exercise) {
-                      return Expanded(
+                    children: [
+                      Expanded(
                         child: Container(
-                          height: 64,
-                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
@@ -484,35 +480,150 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                               width: 1,
                             ),
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(11),
-                            child: Image.network(
-                              'https://via.placeholder.com/64', // TODO: Use real GIF
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                  child: Icon(
-                                    Icons.fitness_center,
-                                    color: Colors.white54,
-                                    size: 24,
-                                  ),
-                                );
-                              },
-                            ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.fitness_center,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${lockedWorkout.exercises.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                'EXERCISES',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.timer_outlined,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${lockedWorkout.estimatedMinutes}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                'MINUTES',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.local_fire_department,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${lockedWorkout.estimatedMinutes * 7}', // Rough calorie estimate
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                'CALORIES',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   
                   const SizedBox(height: 16),
                   
-                  // Action Buttons: START + EDIT
+                  // Action Buttons: ALARM + START + EDIT
                   Row(
                     children: [
+                      // ALARM Button
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          _showWorkoutAlarmPicker(context, lockedWorkout);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.alarm,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(width: 10),
+                      
                       // START WORKOUT Button (Big)
                       Expanded(
-                        flex: 3,
                         child: GestureDetector(
                           onTap: () {
                             HapticFeedback.heavyImpact();
@@ -522,10 +633,10 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                             }
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
                               color: AppColors.electricCyan,
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 BoxShadow(
                                   color: AppColors.electricCyan.withOpacity(0.5),
@@ -539,7 +650,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                                 'START WORKOUT',
                                 style: TextStyle(
                                   color: Colors.black,
-                                  fontSize: 15,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.5,
                                 ),
@@ -549,28 +660,28 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         ),
                       ),
                       
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       
-                      // SWAP Button (Small)
+                      // EDIT Button
                       GestureDetector(
                         onTap: () async {
                           HapticFeedback.mediumImpact();
                           await _openWorkoutLibrary();
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: Colors.white.withOpacity(0.3),
                               width: 1,
                             ),
                           ),
                           child: const Icon(
-                            Icons.swap_horiz,
+                            Icons.edit_outlined,
                             color: Colors.white,
-                            size: 20,
+                            size: 22,
                           ),
                         ),
                       ),
@@ -1085,6 +1196,147 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         );
       }
     }
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WORKOUT ALARM PICKER
+  // ═══════════════════════════════════════════════════════════════════════════
+  void _showWorkoutAlarmPicker(BuildContext context, dynamic workout) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.deepSpace,
+              AppColors.deepSpace.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(32),
+            topRight: Radius.circular(32),
+          ),
+          border: Border.all(
+            color: AppColors.electricCyan.withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.white30,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.alarm,
+                  color: AppColors.electricCyan,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Set Workout Reminder',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              workout.name,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.white70,
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Time selection would go here
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.white10,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.white20,
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.schedule,
+                    color: AppColors.electricCyan,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Alarm feature coming soon! 🔔',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'We\'re building a smart reminder system\nto help you stay consistent',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.white60,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                HapticFeedback.lightImpact();
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.electricCyan,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Center(
+                  child: Text(
+                    'GOT IT',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
