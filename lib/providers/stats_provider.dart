@@ -79,34 +79,40 @@ class WorkoutStats {
 
 /// Provider for workout stats (NO MOCK DATA)
 final workoutStatsProvider = FutureProvider<WorkoutStats>((ref) async {
-  final db = WorkoutHistoryDB.instance;
+  try {
+    final db = WorkoutHistoryDB.instance;
 
-  // Fetch all stats in parallel
-  final results = await Future.wait([
-    db.getTotalWorkouts(),
-    db.getCurrentStreak(),
-    db.getLongestStreak(),
-    db.getTotalRepsThisWeek(),
-    db.getTotalRepsLastWeek(),
-    db.getWorkoutsThisWeek(),
-    db.getTotalTrainingMinutes(),
-    db.getTotalLifetimeReps(),
-    db.getAverageFormScore(),
-    db.getLastWorkoutDate(),
-  ]);
+    // Fetch all stats in parallel with timeout
+    final results = await Future.wait([
+      db.getTotalWorkouts(),
+      db.getCurrentStreak(),
+      db.getLongestStreak(),
+      db.getTotalRepsThisWeek(),
+      db.getTotalRepsLastWeek(),
+      db.getWorkoutsThisWeek(),
+      db.getTotalTrainingMinutes(),
+      db.getTotalLifetimeReps(),
+      db.getAverageFormScore(),
+      db.getLastWorkoutDate(),
+    ]).timeout(const Duration(seconds: 5));
 
-  return WorkoutStats(
-    totalWorkouts: results[0] as int,
-    currentStreak: results[1] as int,
-    longestStreak: results[2] as int,
-    repsThisWeek: results[3] as int,
-    repsLastWeek: results[4] as int,
-    workoutsThisWeek: results[5] as int,
-    totalMinutes: results[6] as int,
-    totalLifetimeReps: results[7] as int,
-    avgFormScore: results[8] as double,
-    lastWorkoutDate: results[9] as DateTime?,
-  );
+    return WorkoutStats(
+      totalWorkouts: results[0] as int,
+      currentStreak: results[1] as int,
+      longestStreak: results[2] as int,
+      repsThisWeek: results[3] as int,
+      repsLastWeek: results[4] as int,
+      workoutsThisWeek: results[5] as int,
+      totalMinutes: results[6] as int,
+      totalLifetimeReps: results[7] as int,
+      avgFormScore: results[8] as double,
+      lastWorkoutDate: results[9] as DateTime?,
+    );
+  } catch (e) {
+    print('❌ Error loading workout stats: $e');
+    // Return empty stats instead of throwing
+    return WorkoutStats.empty();
+  }
 });
 
 /// Provider to refresh stats (call after completing a workout)
