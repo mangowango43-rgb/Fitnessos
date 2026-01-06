@@ -164,7 +164,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildHeader(BuildContext context, WorkoutStats stats) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(4, 16, 12, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -177,10 +177,10 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 width: 48,
                 height: 48,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               // App Name (LIME GREEN)
               const Text(
-                'SKELETAL-PT',
+                'Skelatal--PT',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -198,13 +198,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Streak achievements coming soon! 🔥'),
-                      backgroundColor: AppColors.electricCyan,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  _showStreakAchievements(context, stats);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -233,7 +227,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                 ),
               ),
               
-              const SizedBox(width: 16),
+              const SizedBox(width: 20),
               
               // Settings Icon
               GestureDetector(
@@ -1092,6 +1086,231 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       }
     }
   }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STREAK ACHIEVEMENTS MODAL
+  // ═══════════════════════════════════════════════════════════════════════════
+  void _showStreakAchievements(BuildContext context, WorkoutStats stats) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.deepSpace,
+              AppColors.deepSpace.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(32),
+            topRight: Radius.circular(32),
+          ),
+          border: Border.all(
+            color: AppColors.electricCyan.withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.white30,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        '🔥',
+                        style: TextStyle(fontSize: 32),
+                      ),
+                      const SizedBox(width: 12),
+                      ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [Color(0xFFFF6B35), Color(0xFFFFD60A)],
+                        ).createShader(bounds),
+                        child: const Text(
+                          'STREAK ACHIEVEMENTS',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Current Streak: ${stats.currentStreak} days',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Achievements Grid
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.8,
+                ),
+                itemCount: _streakAchievements.length,
+                itemBuilder: (context, index) {
+                  final achievement = _streakAchievements[index];
+                  final isUnlocked = stats.currentStreak >= achievement['days'] as int;
+                  
+                  return TweenAnimationBuilder(
+                    duration: Duration(milliseconds: 300 + (index * 50)),
+                    tween: Tween<double>(begin: 0, end: 1),
+                    builder: (context, double value, child) {
+                      return Transform.scale(
+                        scale: value,
+                        child: _buildAchievementCard(achievement, isUnlocked),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildAchievementCard(Map<String, dynamic> achievement, bool isUnlocked) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: isUnlocked
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  (achievement['color'] as Color).withOpacity(0.3),
+                  (achievement['color'] as Color).withOpacity(0.1),
+                ],
+              )
+            : LinearGradient(
+                colors: [
+                  AppColors.white5,
+                  AppColors.white10,
+                ],
+              ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isUnlocked
+              ? (achievement['color'] as Color).withOpacity(0.5)
+              : AppColors.white20,
+          width: 2,
+        ),
+        boxShadow: isUnlocked
+            ? [
+                BoxShadow(
+                  color: (achievement['color'] as Color).withOpacity(0.3),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+              ]
+            : [],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TweenAnimationBuilder(
+            duration: const Duration(seconds: 2),
+            tween: Tween<double>(begin: 0, end: isUnlocked ? 1 : 0.5),
+            builder: (context, double value, child) {
+              return Transform.scale(
+                scale: 0.9 + (0.1 * value),
+                child: Text(
+                  achievement['emoji'] as String,
+                  style: TextStyle(
+                    fontSize: 40,
+                    color: Colors.white.withOpacity(isUnlocked ? 1.0 : 0.3),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${achievement['days']} DAYS',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: isUnlocked ? Colors.white : AppColors.white40,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              achievement['title'] as String,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: isUnlocked ? AppColors.white90 : AppColors.white30,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // 20+ Streak Achievements
+  static final List<Map<String, dynamic>> _streakAchievements = [
+    {'days': 1, 'emoji': '⚡', 'title': 'First Step', 'color': Color(0xFF00D9FF)},
+    {'days': 3, 'emoji': '🔥', 'title': 'Getting Hot', 'color': Color(0xFFFF6B35)},
+    {'days': 5, 'emoji': '💪', 'title': 'Strong Start', 'color': Color(0xFF4ECDC4)},
+    {'days': 7, 'emoji': '🌟', 'title': 'Week Warrior', 'color': Color(0xFFFFD60A)},
+    {'days': 10, 'emoji': '🚀', 'title': 'Momentum', 'color': Color(0xFF00D9FF)},
+    {'days': 14, 'emoji': '🏆', 'title': 'Two Weeks', 'color': Color(0xFFB7FF00)},
+    {'days': 21, 'emoji': '💎', 'title': 'Habit Former', 'color': Color(0xFF00D9FF)},
+    {'days': 30, 'emoji': '👑', 'title': 'Monthly King', 'color': Color(0xFFFFD60A)},
+    {'days': 50, 'emoji': '🔱', 'title': 'Unstoppable', 'color': Color(0xFF4ECDC4)},
+    {'days': 75, 'emoji': '⚔️', 'title': 'Warrior', 'color': Color(0xFFFF6B35)},
+    {'days': 100, 'emoji': '🎯', 'title': 'Centurion', 'color': Color(0xFFB7FF00)},
+    {'days': 125, 'emoji': '🌪️', 'title': 'Tornado', 'color': Color(0xFF00D9FF)},
+    {'days': 150, 'emoji': '⚡', 'title': 'Lightning', 'color': Color(0xFFFFD60A)},
+    {'days': 180, 'emoji': '🦾', 'title': 'Half Year', 'color': Color(0xFF4ECDC4)},
+    {'days': 200, 'emoji': '🔮', 'title': 'Legendary', 'color': Color(0xFFFF6B35)},
+    {'days': 250, 'emoji': '🌋', 'title': 'Volcanic', 'color': Color(0xFFB7FF00)},
+    {'days': 300, 'emoji': '🦁', 'title': 'Lion Heart', 'color': Color(0xFFFFD60A)},
+    {'days': 365, 'emoji': '👽', 'title': 'Year Beast', 'color': Color(0xFF00D9FF)},
+    {'days': 500, 'emoji': '🌌', 'title': 'Galactic', 'color': Color(0xFF4ECDC4)},
+    {'days': 750, 'emoji': '🏛️', 'title': 'Titan', 'color': Color(0xFFFF6B35)},
+    {'days': 1000, 'emoji': '🌠', 'title': 'Immortal', 'color': Color(0xFFB7FF00)},
+    {'days': 1500, 'emoji': '⭐', 'title': 'Transcendent', 'color': Color(0xFFFFD60A)},
+  ];
 }
 
 

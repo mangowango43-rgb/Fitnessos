@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/workout_models.dart';
 import '../utils/app_colors.dart';
 import '../utils/text_styles.dart';
 import '../widgets/glassmorphism_card.dart';
 import '../widgets/glow_button.dart';
 import '../providers/workout_provider.dart';
+import '../services/exercise_animation_database.dart';
 
 class WorkoutEditorScreen extends ConsumerStatefulWidget {
   final WorkoutPreset preset;
@@ -203,6 +205,8 @@ class _WorkoutEditorScreenState extends ConsumerState<WorkoutEditorScreen> {
   }
 
   Widget _buildExerciseCard(WorkoutExercise exercise, int index) {
+    final gifUrl = ExerciseAnimationDatabase.getAnimationUrl(exercise.id);
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GlassmorphismCard(
@@ -210,7 +214,7 @@ class _WorkoutEditorScreenState extends ConsumerState<WorkoutEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Checkbox and exercise name
+            // Checkbox, Exercise GIF and name
             Row(
               children: [
                 GestureDetector(
@@ -247,6 +251,51 @@ class _WorkoutEditorScreenState extends ConsumerState<WorkoutEditorScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
+                
+                // Exercise GIF
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: exercise.included
+                          ? AppColors.cyberLime.withOpacity(0.5)
+                          : AppColors.white20,
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: CachedNetworkImage(
+                      imageUrl: gifUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: AppColors.white10,
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.cyberLime,
+                            ),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: AppColors.white10,
+                        child: const Icon(
+                          Icons.fitness_center,
+                          color: AppColors.white40,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                
                 Expanded(
                   child: Text(
                     exercise.name,
