@@ -442,7 +442,20 @@ class _V2OnboardingMainState extends ConsumerState<V2OnboardingMain> {
           ),
           _buildPrimaryButton(
             text: 'Continue',
-            onPressed: _selectedConstraints.isNotEmpty ? _nextPage : null,
+            onPressed: () {
+              if (_selectedConstraints.isEmpty) {
+                HapticFeedback.lightImpact();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please select at least one option'),
+                    backgroundColor: AppColors.neonCrimson,
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              } else {
+                _nextPage();
+              }
+            },
           ),
           const SizedBox(height: 32),
         ],
