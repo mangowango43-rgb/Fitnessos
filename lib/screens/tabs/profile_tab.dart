@@ -528,21 +528,59 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           style: const TextStyle(color: Colors.white),
         ),
         content: Text(
-          'Video player coming soon!\n\nRecorded: ${_formatDate(recording.recordedAt)}\nDuration: ${_formatDuration(recording.duration)}',
-          style: const TextStyle(color: AppColors.white70),
+          'Video player coming soon!\n\nRecorded: ${_formatDate(recording.recordedAt)}\nDuration: ${_formatDuration(recording.duration)}\n\nPath: ${recording.videoPath}',
+          style: const TextStyle(color: AppColors.white70, fontSize: 12),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(color: AppColors.cyberLime)),
+            child: const Text('CLOSE', style: TextStyle(color: AppColors.white50)),
           ),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
+              HapticFeedback.mediumImpact();
+              
+              // Save to device
+              final success = await WorkoutRecordingService.saveToDevice(
+                recording.videoPath,
+                recording.workoutName,
+              );
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success 
+                        ? '✅ Saved to Downloads/FitnessOS/' 
+                        : '❌ Failed to save. Check permissions.',
+                    ),
+                    backgroundColor: success ? AppColors.cyberLime : AppColors.neonCrimson,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('SAVE TO DEVICE', style: TextStyle(color: AppColors.cyberLime)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              HapticFeedback.heavyImpact();
               await WorkoutRecordingService.deleteRecording(recording.id);
               await _loadRecordings();
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🗑️ Recording deleted'),
+                    backgroundColor: AppColors.neonCrimson,
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.neonCrimson)),
+            child: const Text('DELETE', style: TextStyle(color: AppColors.neonCrimson)),
           ),
         ],
       ),

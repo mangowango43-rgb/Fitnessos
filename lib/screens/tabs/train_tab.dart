@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,7 @@ import '../../models/workout_models.dart';
 import '../../models/rep_quality.dart';
 import '../../providers/workout_provider.dart';
 import '../../providers/stats_provider.dart';
+import '../home_screen.dart' show TabNavigator;
 
 // NEW: Import the rep counting system
 import '../../services/workout_session.dart';
@@ -550,23 +552,34 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         HapticFeedback.heavyImpact();
         debugPrint('🎥 Stopped recording: ${videoFile.path}');
         
-        // Save to database
+        // Save to persistent storage
         final workoutName = _lockedWorkout?.name ?? 'Unknown Workout';
-        await WorkoutRecordingService.saveRecording(
+        final savedPath = await WorkoutRecordingService.saveRecording(
           workoutName: workoutName,
           videoPath: videoFile.path,
           duration: duration,
         );
         
-        debugPrint('✅ Recording saved: $workoutName ($duration)');
+        debugPrint('✅ Recording saved to persistent storage: $savedPath');
         
         // Show success feedback
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Recording saved to Profile ($workoutName)'),
+              content: Text('✅ Recording saved! View in Profile tab'),
               backgroundColor: AppColors.cyberLime,
               duration: const Duration(seconds: 2),
+              action: SnackBarAction(
+                label: 'VIEW',
+                textColor: Colors.black,
+                onPressed: () {
+                  // Navigate to profile tab
+                  final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+                  if (navigator != null) {
+                    (navigator as dynamic).changeTab(3); // Profile tab
+                  }
+                },
+              ),
             ),
           );
         }
@@ -980,14 +993,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           child: PowerGauge(fillPercent: _powerGaugeFill),
         ),
 
-        // EXERCISE ANIMATION PIP - Left side, above power gauge (rep meter)
-        Positioned(
-          top: 180, // Just under the angle counter
-          left: 16, // Stuck to left of screen
-          child: ExerciseAnimationPIP(
-            exerciseId: exercise.id,
-          ),
-        ),
+        // EXERCISE ANIMATION PIP - REMOVED per user request
 
         // GAMING: Shatter Animation - Full screen overlay
         if (_showShatterAnimation)
@@ -1130,7 +1136,7 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
 
         // REP COUNTER - Bottom Right (same level as record and finish buttons)
         Positioned(
-          bottom: 39, // Same level as record and finish buttons (was 100)
+          bottom: 58, // Pushed higher (was 39)
           right: 20,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -1227,9 +1233,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // Record button - Bottom Left (pushed up by 0.5cm / ~19px)
+        // Record button - Bottom Left (pushed higher)
         Positioned(
-          bottom: 39, // Was 20, now 39 (pushed up by ~0.5cm)
+          bottom: 58, // Pushed higher (was 39)
           left: 20,
           child: GestureDetector(
             onTap: () async {
@@ -1260,9 +1266,9 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           ),
         ),
 
-        // Bottom center button (FINISH - pushed up by 0.5cm / ~19px)
+        // Bottom center button (FINISH - pushed higher)
         Positioned(
-          bottom: 39, // Was 20, now 39 (pushed up by ~0.5cm)
+          bottom: 58, // Pushed higher (was 39)
           left: 0,
           right: 0,
           child: Center(

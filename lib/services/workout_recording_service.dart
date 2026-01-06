@@ -3,6 +3,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Service for managing workout video recordings
 class WorkoutRecordingService {
@@ -36,8 +37,8 @@ class WorkoutRecordingService {
     );
   }
 
-  /// Save a new workout recording
-  static Future<void> saveRecording({
+  /// Save a new workout recording (copies to persistent storage)
+  static Future<String> saveRecording({
     required String workoutName,
     required String videoPath,
     String? thumbnailPath,
@@ -46,16 +47,40 @@ class WorkoutRecordingService {
     final db = await database;
     final id = DateTime.now().millisecondsSinceEpoch.toString();
 
-    await db.insert('recordings', {
-      'id': id,
-      'workoutName': workoutName,
-      'videoPath': videoPath,
-      'thumbnailPath': thumbnailPath,
-      'duration': duration.inSeconds,
-      'recordedAt': DateTime.now().toIso8601String(),
-    });
+    // Copy video to our persistent recordings directory
+    final recordingsDir = await getRecordingsDirectory();
+    final fileName = '${id}_${workoutName.replaceAll(' ', '_')}.mp4';
+    final newPath = join(recordingsDir.path, fileName);
+    
+    try {
+      final originalFile = File(videoPath);
+      final savedFile = await originalFile.copy(newPath);
+      debugPrint('📁 Copied video to persistent storage: ${savedFile.path}');
+      
+      await db.insert('recordings', {
+        'id': id,
+        'workoutName': workoutName,
+        'videoPath': savedFile.path,  // Use the new persistent path
+        'thumbnailPath': thumbnailPath,
+        'duration': duration.inSeconds,
+        'recordedAt': DateTime.now().toIso8601String(),
+      });
 
-    debugPrint('✅ Saved recording: $workoutName ($id)');
+      debugPrint('✅ Saved recording to database: $workoutName ($id)');
+      return savedFile.path;
+    } catch (e) {
+      debugPrint('❌ Error saving recording: $e');
+      // Fallback to original path if copy fails
+      await db.insert('recordings', {
+        'id': id,
+        'workoutName': workoutName,
+        'videoPath': videoPath,
+        'thumbnailPath': thumbnailPath,
+        'duration': duration.inSeconds,
+        'recordedAt': DateTime.now().toIso8601String(),
+      });
+      return videoPath;
+    }
   }
 
   /// Get all recordings
@@ -119,6 +144,60 @@ class WorkoutRecordingService {
     }
     
     return recordingsDir;
+  }
+  
+  /// Save recording to device's gallery/downloads
+  static Future<bool> saveToDevice(String videoPath, String workoutName) async {
+    try {
+      // Request storage permission
+      final status = await Permission.storage.request();
+      if (!status.isGranted) {
+        // Try manageExternalStorage for Android 11+
+        final manageStatus = await Permission.manageExternalStorage.request();
+        if (!manageStatus.isGranted) {
+          debugPrint('❌ Storage permission denied');
+          return false;
+        }
+      }
+
+      // Get Downloads directory
+      Directory? downloadsDir;
+      
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          downloadsDir = Directory('/storage/emulated/0/Downloads');
+        }
+      } else if (Platform.isIOS) {
+        // iOS: Save to app's documents directory (accessible via Files app)
+        downloadsDir = await getApplicationDocumentsDirectory();
+      }
+
+      if (downloadsDir == null || !await downloadsDir.exists()) {
+        debugPrint('❌ Could not find downloads directory');
+        return false;
+      }
+
+      // Create FitnessOS folder in Downloads
+      final fitnessDir = Directory('${downloadsDir.path}/FitnessOS');
+      if (!await fitnessDir.exists()) {
+        await fitnessDir.create(recursive: true);
+      }
+
+      // Copy video to device storage
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${workoutName.replaceAll(' ', '_')}_$timestamp.mp4';
+      final destination = File('${fitnessDir.path}/$fileName');
+      
+      final videoFile = File(videoPath);
+      await videoFile.copy(destination.path);
+      
+      debugPrint('✅ Saved to device: ${destination.path}');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error saving to device: $e');
+      return false;
+    }
   }
 }
 
