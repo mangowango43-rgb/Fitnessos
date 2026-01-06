@@ -6,6 +6,7 @@ import '../models/workout_models.dart';
 class StorageService {
   static const String _keyOnboardingComplete = 'onboarding_complete';
   static const String _keyUser = 'user';
+  static const String _keyUserName = 'user_name';
   static const String _keyUnitsMetric = 'units_metric';
   static const String _keyNotificationsEnabled = 'notifications_enabled';
   static const String _keyLockedWorkout = 'locked_workout';
@@ -75,6 +76,17 @@ class StorageService {
 
   Future<void> clearLockedWorkout() async {
     await _prefs.remove(_keyLockedWorkout);
+  }
+
+  // User Name (static methods for easy access)
+  static Future<String?> getUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyUserName);
+  }
+
+  static Future<void> saveUserName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyUserName, name);
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/haptic_helper.dart';
 import '../../services/pose_detector_service.dart';
+import '../../services/workout_recording_service.dart';
 import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
 import '../../widgets/shatter_animation.dart';
@@ -58,6 +59,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   double _formScore = 0;
   bool _showRepFlash = false;
   bool _isRecording = false;
+  DateTime? _recordingStartTime;
+  String? _currentRecordingPath;
 
   // GAMING FEATURES
   SkeletonState _skeletonState = SkeletonState.normal;
@@ -485,6 +488,86 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
       _landmarks = null;
       _currentExerciseIndex = 0;
     });
+  }
+
+  /// Toggle workout recording
+  Future<void> _toggleRecording() async {
+    if (!_isRecording) {
+      // Start recording
+      try {
+        if (_cameraController == null || !_cameraController!.value.isInitialized) {
+          debugPrint('❌ Camera not initialized for recording');
+          return;
+        }
+
+        await _cameraController!.startVideoRecording();
+        setState(() {
+          _isRecording = true;
+          _recordingStartTime = DateTime.now();
+        });
+        
+        HapticFeedback.heavyImpact();
+        debugPrint('🎥 Started recording workout');
+        
+        // Show feedback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎥 Recording started'),
+              backgroundColor: AppColors.neonCrimson,
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('❌ Error starting recording: $e');
+        setState(() {
+          _isRecording = false;
+        });
+      }
+    } else {
+      // Stop recording
+      try {
+        if (_cameraController == null) return;
+
+        final videoFile = await _cameraController!.stopVideoRecording();
+        final duration = DateTime.now().difference(_recordingStartTime ?? DateTime.now());
+        
+        setState(() {
+          _isRecording = false;
+          _currentRecordingPath = videoFile.path;
+        });
+        
+        HapticFeedback.heavyImpact();
+        debugPrint('🎥 Stopped recording: ${videoFile.path}');
+        
+        // Save to database
+        final workoutName = _lockedWorkout?.name ?? 'Unknown Workout';
+        await WorkoutRecordingService.saveRecording(
+          workoutName: workoutName,
+          videoPath: videoFile.path,
+          duration: duration,
+        );
+        
+        debugPrint('✅ Recording saved: $workoutName ($duration)');
+        
+        // Show success feedback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Recording saved to Profile ($workoutName)'),
+              backgroundColor: AppColors.cyberLime,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('❌ Error stopping recording: $e');
+        setState(() {
+          _isRecording = false;
+        });
+      }
+    }
   }
 
   @override
@@ -1140,12 +1223,8 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
           bottom: 40,
           left: 20,
           child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _isRecording = !_isRecording;
-              });
-              // TODO: Implement video recording
-              print('🎥 Recording: $_isRecording');
+            onTap: () async {
+              await _toggleRecording();
             },
             child: Container(
               padding: const EdgeInsets.all(16),

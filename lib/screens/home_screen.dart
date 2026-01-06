@@ -4,7 +4,7 @@ import '../widgets/cyber_grid_background.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/train_tab.dart';
 import 'tabs/workouts_tab.dart';
-import 'tabs/settings_tab.dart';
+import 'tabs/profile_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialTab;
@@ -34,12 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
     HomeTab(),
     TrainTab(),
     WorkoutsTab(),
+    ProfileTab(),
   ];
 
   final List<_TabInfo> _tabInfo = const [
     _TabInfo(icon: Icons.home, label: 'HOME'),
     _TabInfo(icon: Icons.videocam, label: 'TRAIN'),
     _TabInfo(icon: Icons.fitness_center, label: 'WORKOUTS'),
+    _TabInfo(icon: Icons.person, label: 'PROFILE'),
   ];
 
   @override
@@ -71,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     return Expanded(
                       child: GestureDetector(
+                        behavior: HitTestBehavior.opaque, // Makes entire area touchable!
                         onTap: () {
                           changeTab(index);
                         },
