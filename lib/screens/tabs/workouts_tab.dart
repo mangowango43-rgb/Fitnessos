@@ -128,28 +128,20 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
             ),
           );
         },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+        child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.cyberLime,
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.cyberLime.withOpacity(0.4),
-                blurRadius: 20,
-                spreadRadius: 0,
-              ),
-            ],
           ),
-          child: const Center(
+          child: Center(
             child: Text(
               '✨ CUSTOM WORKOUTS',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.5,
-                color: Colors.black,
+                color: AppColors.white60,
               ),
             ),
           ),
