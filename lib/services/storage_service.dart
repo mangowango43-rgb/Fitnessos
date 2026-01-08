@@ -13,6 +13,7 @@ class StorageService {
   static const String _keyLockedWorkout = 'locked_workout';
   static const String _keyScheduledWorkouts = 'scheduled_workouts';
   static const String _keyWorkoutAlarms = 'workout_alarms';
+  static const String _keyCustomWorkouts = 'custom_workouts'; // New: Store custom workouts
 
   final SharedPreferences _prefs;
 
@@ -173,6 +174,53 @@ class StorageService {
 
   String _dateToKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  // Custom Workouts
+  Future<void> saveCustomWorkout(WorkoutPreset workout) async {
+    final customWorkouts = getCustomWorkouts();
+    customWorkouts[workout.id] = workout;
+    
+    final workoutsJson = customWorkouts.map(
+      (key, value) => MapEntry(key, jsonEncode(value.toJson())),
+    );
+    await _prefs.setString(_keyCustomWorkouts, jsonEncode(workoutsJson));
+    debugPrint('✅ Saved custom workout: ${workout.name}');
+  }
+
+  Map<String, WorkoutPreset> getCustomWorkouts() {
+    final jsonString = _prefs.getString(_keyCustomWorkouts);
+    if (jsonString == null) return {};
+    
+    try {
+      final Map<String, dynamic> workoutsJson = jsonDecode(jsonString);
+      return workoutsJson.map((key, value) {
+        final workoutJson = jsonDecode(value);
+        return MapEntry(key, WorkoutPreset.fromJson(workoutJson));
+      });
+    } catch (e) {
+      debugPrint('Error loading custom workouts: $e');
+      return {};
+    }
+  }
+
+  List<WorkoutPreset> getCustomWorkoutsList() {
+    return getCustomWorkouts().values.toList();
+  }
+
+  Future<void> deleteCustomWorkout(String workoutId) async {
+    final customWorkouts = getCustomWorkouts();
+    customWorkouts.remove(workoutId);
+    
+    final workoutsJson = customWorkouts.map(
+      (key, value) => MapEntry(key, jsonEncode(value.toJson())),
+    );
+    await _prefs.setString(_keyCustomWorkouts, jsonEncode(workoutsJson));
+    debugPrint('🗑️ Deleted custom workout: $workoutId');
+  }
+
+  Future<void> updateCustomWorkout(WorkoutPreset workout) async {
+    await saveCustomWorkout(workout); // Same as save
   }
 }
 

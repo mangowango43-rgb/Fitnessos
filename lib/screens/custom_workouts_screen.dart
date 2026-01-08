@@ -7,6 +7,7 @@ import '../utils/app_colors.dart';
 import '../widgets/exercise_animation_widget.dart';
 import '../widgets/glow_button.dart';
 import '../providers/workout_provider.dart';
+import '../services/storage_service.dart';
 
 class CustomWorkoutsScreen extends ConsumerStatefulWidget {
   const CustomWorkoutsScreen({super.key});
@@ -54,13 +55,14 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
           WorkoutData.muscleSplits['arms']!.any((c) => c.id == e.id)
         ).toList();
       } else if (_selectedCategory == 'lower') {
+        // Fix: Only reference 'legs' - glutes don't exist as separate category
         exercises = exercises.where((e) => 
-          WorkoutData.muscleSplits['legs']!.any((c) => c.id == e.id) ||
-          WorkoutData.muscleSplits['glutes']!.any((c) => c.id == e.id)
+          WorkoutData.muscleSplits['legs']!.any((c) => c.id == e.id)
         ).toList();
       } else if (_selectedCategory == 'core') {
+        // Fix: Use 'core' key which exists in muscleSplits
         exercises = exercises.where((e) => 
-          WorkoutData.muscleSplits['abs']!.any((c) => c.id == e.id)
+          WorkoutData.muscleSplits['core']!.any((c) => c.id == e.id)
         ).toList();
       } else if (_selectedCategory == 'cardio') {
         exercises = exercises.where((e) => 
@@ -125,6 +127,9 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
       return;
     }
 
+    // Ask if user wants to save the workout
+    final shouldSave = await _showSaveDialog();
+
     HapticFeedback.heavyImpact();
 
     // Create WorkoutPreset from custom workout
@@ -147,6 +152,12 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
       }).toList(),
     );
 
+    // Save if user chose to
+    if (shouldSave == true) {
+      final storage = await StorageService.getInstance();
+      await storage.saveCustomWorkout(customPreset);
+    }
+
     // Commit the workout
     await ref.read(committedWorkoutProvider.notifier).commitWorkout(customPreset);
 
@@ -154,12 +165,14 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
-            children: const [
-              Icon(Icons.check_circle, color: AppColors.cyberLime),
-              SizedBox(width: 12),
+            children: [
+              const Icon(Icons.check_circle, color: AppColors.cyberLime),
+              const SizedBox(width: 12),
               Text(
-                'Custom Workout Committed! ✅',
-                style: TextStyle(
+                shouldSave == true 
+                    ? 'Custom Workout Saved & Committed! ✅'
+                    : 'Custom Workout Committed! ✅',
+                style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -178,6 +191,57 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
       // Navigate back to workouts tab (will auto-switch to home)
       Navigator.of(context).pop();
     }
+  }
+
+  Future<bool?> _showSaveDialog() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1a1a1a),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.cyberLime.withOpacity(0.3), width: 2),
+        ),
+        title: const Text(
+          'Save Workout?',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: const Text(
+          'Do you want to save this workout to use again later?',
+          style: TextStyle(
+            color: AppColors.white70,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'NO, JUST COMMIT',
+              style: TextStyle(
+                color: AppColors.white50,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.cyberLime.withOpacity(0.2),
+            ),
+            child: const Text(
+              'YES, SAVE IT',
+              style: TextStyle(
+                color: AppColors.cyberLime,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -255,7 +319,189 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
               ],
             ),
           ),
+          // Load saved workouts button
+          IconButton(
+            onPressed: _showSavedWorkouts,
+            icon: const Icon(Icons.folder_open, color: AppColors.cyberLime, size: 28),
+            tooltip: 'My Saved Workouts',
+          ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showSavedWorkouts() async {
+    final storage = await StorageService.getInstance();
+    final savedWorkouts = storage.getCustomWorkoutsList();
+
+    if (!mounted) return;
+
+    if (savedWorkouts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No saved workouts yet!'),
+          backgroundColor: AppColors.white10,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'MY SAVED WORKOUTS',
+                    style: TextStyle(
+                      color: AppColors.cyberLime,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            // List of saved workouts
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: savedWorkouts.length,
+                itemBuilder: (context, index) {
+                  final workout = savedWorkouts[index];
+                  return _buildSavedWorkoutCard(workout);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSavedWorkoutCard(WorkoutPreset workout) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white5,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.white10),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            _loadWorkout(workout);
+            Navigator.pop(context);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.cyberLime.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.fitness_center,
+                    color: AppColors.cyberLime,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        workout.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${workout.exercises.length} exercises',
+                        style: const TextStyle(
+                          color: AppColors.white50,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () async {
+                    final storage = await StorageService.getInstance();
+                    await storage.deleteCustomWorkout(workout.id);
+                    Navigator.pop(context);
+                    _showSavedWorkouts();
+                  },
+                  icon: const Icon(Icons.delete_outline, color: AppColors.neonCrimson),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _loadWorkout(WorkoutPreset workout) {
+    setState(() {
+      _workoutNameController.text = workout.name;
+      _selectedExercises.clear();
+      _exerciseSettings.clear();
+      
+      for (final exercise in workout.exercises) {
+        // Find the matching exercise from allExercises
+        final matchedExercise = _allExercises.firstWhere(
+          (e) => e.id == exercise.id,
+          orElse: () => Exercise(
+            id: exercise.id,
+            name: exercise.name,
+            difficulty: 'intermediate',
+            equipment: 'weights',
+          ),
+        );
+        
+        _selectedExercises.add(matchedExercise);
+        _exerciseSettings[exercise.id] = ExerciseSettings(
+          sets: exercise.sets,
+          reps: exercise.reps,
+          restSeconds: exercise.restSeconds ?? 60,
+        );
+      }
+    });
+    
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Loaded: ${workout.name}'),
+        backgroundColor: AppColors.cyberLime,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -493,9 +739,11 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
 
   Widget _buildWorkoutBuilderPanel() {
     return DraggableScrollableSheet(
-      initialChildSize: 0.35,
-      minChildSize: 0.15,
-      maxChildSize: 0.7,
+      initialChildSize: 0.45, // Increased from 0.35 to make it more visible
+      minChildSize: 0.20, // Increased from 0.15
+      maxChildSize: 0.85, // Increased from 0.7 for better expansion
+      snap: true,
+      snapSizes: const [0.20, 0.45, 0.85], // Snap points for smooth interaction
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
