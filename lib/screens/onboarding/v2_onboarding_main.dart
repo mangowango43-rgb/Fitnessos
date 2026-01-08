@@ -414,32 +414,33 @@ class _V2OnboardingMainState extends ConsumerState<V2OnboardingMain> {
             style: TextStyle(color: AppColors.white60, fontSize: 16),
           ),
           const SizedBox(height: 40),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              itemCount: constraints.length,
-              itemBuilder: (context, index) {
-                final constraint = constraints[index];
-                final isSelected = _selectedConstraints.contains(constraint['id']);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildCheckboxCard(
-                    text: constraint['text']!,
-                    isSelected: isSelected,
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedConstraints.remove(constraint['id']);
-                        } else {
-                          _selectedConstraints.add(constraint['id']!);
-                        }
-                      });
-                    },
-                  ),
-                );
-              },
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            itemCount: constraints.length,
+            itemBuilder: (context, index) {
+              final constraint = constraints[index];
+              final isSelected = _selectedConstraints.contains(constraint['id']);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildCheckboxCard(
+                  text: constraint['text']!,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedConstraints.remove(constraint['id']);
+                      } else {
+                        _selectedConstraints.add(constraint['id']!);
+                      }
+                    });
+                  },
+                ),
+              );
+            },
           ),
+          const SizedBox(height: 20),
           _buildPrimaryButton(
             text: 'Continue',
             onPressed: () {
@@ -535,32 +536,33 @@ class _V2OnboardingMainState extends ConsumerState<V2OnboardingMain> {
             style: TextStyle(color: AppColors.white60, fontSize: 16),
           ),
           const SizedBox(height: 40),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              itemCount: motivations.length,
-              itemBuilder: (context, index) {
-                final motivation = motivations[index];
-                final isSelected = _motivations.contains(motivation);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildCheckboxCard(
-                    text: motivation,
-                    isSelected: isSelected,
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _motivations.remove(motivation);
-                        } else {
-                          _motivations.add(motivation);
-                        }
-                      });
-                    },
-                  ),
-                );
-              },
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            itemCount: motivations.length,
+            itemBuilder: (context, index) {
+              final motivation = motivations[index];
+              final isSelected = _motivations.contains(motivation);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildCheckboxCard(
+                  text: motivation,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _motivations.remove(motivation);
+                      } else {
+                        _motivations.add(motivation);
+                      }
+                    });
+                  },
+                ),
+              );
+            },
           ),
+          const SizedBox(height: 20),
           _buildPrimaryButton(
             text: "That's My Why",
             onPressed: _motivations.isNotEmpty ? _nextPage : null,
@@ -594,28 +596,29 @@ class _V2OnboardingMainState extends ConsumerState<V2OnboardingMain> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: options.length,
-              itemBuilder: (context, index) {
-                final option = options[index];
-                final isSelected = _accountability == option['id'];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _buildSelectableCard(
-                    emoji: option['emoji']!,
-                    title: option['title']!,
-                    subtitle: option['subtitle']!,
-                    isSelected: isSelected,
-                    onTap: () {
-                      setState(() => _accountability = option['id']);
-                    },
-                  ),
-                );
-              },
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: options.length,
+            itemBuilder: (context, index) {
+              final option = options[index];
+              final isSelected = _accountability == option['id'];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildSelectableCard(
+                  emoji: option['emoji']!,
+                  title: option['title']!,
+                  subtitle: option['subtitle']!,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() => _accountability = option['id']);
+                  },
+                ),
+              );
+            },
           ),
+          const SizedBox(height: 20),
           _buildPrimaryButton(
             text: 'Continue',
             onPressed: _accountability != null ? _nextPage : null,
@@ -649,28 +652,29 @@ class _V2OnboardingMainState extends ConsumerState<V2OnboardingMain> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: styles.length,
-              itemBuilder: (context, index) {
-                final style = styles[index];
-                final isSelected = _coachingStyle == style['id'];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _buildSelectableCard(
-                    emoji: style['emoji']!,
-                    title: style['title']!,
-                    subtitle: style['quote']!,
-                    isSelected: isSelected,
-                    onTap: () {
-                      setState(() => _coachingStyle = style['id']);
-                    },
-                  ),
-                );
-              },
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: styles.length,
+            itemBuilder: (context, index) {
+              final style = styles[index];
+              final isSelected = _coachingStyle == style['id'];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildSelectableCard(
+                  emoji: style['emoji']!,
+                  title: style['title']!,
+                  subtitle: style['quote']!,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() => _coachingStyle = style['id']);
+                  },
+                ),
+              );
+            },
           ),
+          const SizedBox(height: 20),
           _buildPrimaryButton(
             text: 'Select',
             onPressed: _coachingStyle != null ? _nextPage : null,

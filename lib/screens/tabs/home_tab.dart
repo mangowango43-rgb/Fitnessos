@@ -6,9 +6,12 @@ import '../../providers/stats_provider.dart';
 import '../../providers/workout_provider.dart';
 import '../../providers/workout_schedule_provider.dart';
 import '../../models/workout_schedule.dart';
+import '../../models/workout_models.dart';
+import '../../services/storage_service.dart';
 import '../../widgets/animated_counter.dart';
 import '../../widgets/schedule_workout_modal.dart';
 import '../../widgets/workout_library_modal.dart';
+import '../../widgets/workout_date_strip.dart';
 import '../home_screen.dart' show TabNavigator;
 import '../tabs/settings_tab.dart';
 
@@ -29,10 +32,15 @@ class HomeTab extends ConsumerStatefulWidget {
 class _HomeTabState extends ConsumerState<HomeTab> {
   DateTime _selectedDate = DateTime.now();
 
+  Future<Map<String, dynamic>?> _getWorkoutAlarm() async {
+    final storage = await StorageService.getInstance();
+    return storage.getWorkoutAlarm(_selectedDate);
+  }
+
   @override
   Widget build(BuildContext context) {
     final statsAsync = ref.watch(workoutStatsProvider);
-    final lockedWorkout = ref.watch(lockedWorkoutProvider);
+    final committedWorkout = ref.watch(committedWorkoutProvider);
 
     // Get stats - use previous value while loading to prevent grey flash
     final stats = statsAsync.valueOrNull ?? WorkoutStats.empty();
@@ -113,7 +121,20 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                               // ═══════════════════════════════════════════════
                               // HERO WORKOUT CARD: Today's scheduled workout
                               // ═══════════════════════════════════════════════
-                              _buildHeroWorkoutCard(context, ref, lockedWorkout),
+                              _buildHeroWorkoutCard(context, ref, committedWorkout),
+
+                              const SizedBox(height: 20),
+
+                              // ═══════════════════════════════════════════════
+                              // DATE STRIP: Workout scheduling
+                              // ═══════════════════════════════════════════════
+                              WorkoutDateStrip(
+                                selectedDate: _selectedDate,
+                                onDateSelected: (date) {
+                                  setState(() => _selectedDate = date);
+                                },
+                                accentColor: AppColors.cyberLime,
+                              ),
 
                               const SizedBox(height: 20),
 
@@ -353,8 +374,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // ═══════════════════════════════════════════════════════════════════════════
   // HERO WORKOUT CARD (Glassmorphism design inspired by FutureYou)
   // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildHeroWorkoutCard(BuildContext context, WidgetRef ref, dynamic lockedWorkout) {
-    if (lockedWorkout == null) {
+  Widget _buildHeroWorkoutCard(BuildContext context, WidgetRef ref, dynamic committedWorkout) {
+    if (committedWorkout == null) {
       return _buildNoWorkoutCard(context);
     }
 
@@ -413,18 +434,66 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              lockedWorkout.name.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    committedWorkout.name.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
+                                // Show alarm indicator if alarm is set
+                                FutureBuilder<Map<String, dynamic>?>(
+                                  future: _getWorkoutAlarm(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && snapshot.data != null) {
+                                      final alarmData = snapshot.data!;
+                                      final hour = alarmData['hour'] as int;
+                                      final minute = alarmData['minute'] as int;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.cyberLime.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: AppColors.cyberLime,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.alarm,
+                                              color: AppColors.cyberLime,
+                                              size: 12,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                                              style: const TextStyle(
+                                                color: AppColors.cyberLime,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${lockedWorkout.exercises.length} exercises • ~${lockedWorkout.estimatedMinutes} min',
+                              '${committedWorkout.exercises.length} exercises • ${committedWorkout.totalSets} total sets',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.8),
                                 fontSize: 13,
@@ -489,7 +558,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${lockedWorkout.exercises.length}',
+                                '${committedWorkout.exercises.length}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -523,13 +592,13 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                           child: Column(
                             children: [
                               const Icon(
-                                Icons.timer_outlined,
+                                Icons.format_list_numbered,
                                 color: Colors.white70,
                                 size: 20,
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${lockedWorkout.estimatedMinutes}',
+                                '${committedWorkout.totalSets}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -537,7 +606,47 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                                 ),
                               ),
                               Text(
-                                'MINUTES',
+                                'SETS',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.local_fire_department,
+                                color: AppColors.neonCrimson,
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${committedWorkout.estimatedCalories}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                'CALORIES',
                                 style: TextStyle(
                                   color: Colors.white.withOpacity(0.7),
                                   fontSize: 9,
@@ -569,7 +678,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${lockedWorkout.estimatedMinutes * 7}', // Rough calorie estimate
+                                '${committedWorkout.estimatedMinutes * 7}', // Rough calorie estimate
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -600,7 +709,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       GestureDetector(
                         onTap: () {
                           HapticFeedback.mediumImpact();
-                          _showWorkoutAlarmPicker(context, lockedWorkout);
+                          _showWorkoutAlarmPicker(context, committedWorkout);
                         },
                         child: Container(
                           padding: const EdgeInsets.all(14),
@@ -666,7 +775,20 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       GestureDetector(
                         onTap: () async {
                           HapticFeedback.mediumImpact();
-                          await _openWorkoutLibrary();
+                          // Show schedule modal first
+                          final result = await showModalBottomSheet<Map<String, dynamic>>(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => ScheduleWorkoutModal(
+                              selectedDate: _selectedDate,
+                            ),
+                          );
+                          
+                          if (result != null && mounted) {
+                            // Then show workout library
+                            await _openWorkoutLibraryWithSchedule(result);
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.all(14),
@@ -1132,14 +1254,77 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     );
 
     if (selected != null && mounted) {
-      // TODO: Lock the selected workout as hero
-      // For now, show confirmation
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${selected['name']} selected! (Integration coming)'),
-          backgroundColor: AppColors.cyberLime,
-        ),
+      // Create workout preset from selected data
+      final preset = WorkoutPreset(
+        id: selected['id'] as String,
+        name: selected['name'] as String,
+        category: 'gym',
+        subcategory: selected['type'] as String? ?? 'gym',
+        exercises: [], // Will be populated from workout data
+        isCircuit: false,
+        duration: selected['duration'] as String?,
       );
+      
+      await ref
+          .read(committedWorkoutProvider.notifier)
+          .commitWorkout(preset);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Workout Committed! ✅ "${selected['name']}"'),
+            backgroundColor: AppColors.cyberLime,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openWorkoutLibraryWithSchedule(Map<String, dynamic> scheduleInfo) async {
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const WorkoutLibraryModal(),
+    );
+
+    if (selected != null && mounted) {
+      // Create workout preset from selected data
+      final preset = WorkoutPreset(
+        id: selected['id'] as String,
+        name: selected['name'] as String,
+        category: 'gym',
+        subcategory: selected['type'] as String? ?? 'gym',
+        exercises: [], // Will be populated from workout data
+        isCircuit: false,
+        duration: selected['duration'] as String?,
+      );
+      
+      // Schedule the workout with alarm info
+      await ref.read(committedWorkoutProvider.notifier).scheduleWorkout(
+        _selectedDate,
+        preset,
+        alarmTime: scheduleInfo['time'],
+        repeatDays: scheduleInfo['repeatDays'] ?? [],
+      );
+      
+      // Also commit it as the current workout
+      await ref.read(committedWorkoutProvider.notifier).commitWorkout(preset);
+      
+      if (mounted) {
+        final timeStr = scheduleInfo['time'] != null
+            ? ' with alarm at ${(scheduleInfo['time'] as TimeOfDay).format(context)}'
+            : '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Workout Scheduled! 🔥 "${selected['name']}"$timeStr'),
+            backgroundColor: AppColors.cyberLime,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 

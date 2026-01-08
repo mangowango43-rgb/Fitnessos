@@ -115,15 +115,34 @@ class PhonePositionGuide extends StatelessWidget {
           
           const SizedBox(height: 16),
           
-          // Tips
+          // Tips - Comprehensive list
           const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _TipRow(icon: Icons.wb_sunny_outlined, text: 'Good lighting helps tracking'),
+              _TipRow(
+                icon: Icons.social_distance,
+                text: 'Step back 5-7 feet from camera',
+              ),
               SizedBox(height: 8),
-              _TipRow(icon: Icons.stay_current_portrait, text: 'Use portrait mode'),
+              _TipRow(
+                icon: Icons.height,
+                text: 'Phone at waist height (not floor)',
+              ),
               SizedBox(height: 8),
-              _TipRow(icon: Icons.visibility, text: 'Ensure full body is visible'),
+              _TipRow(
+                icon: Icons.stay_current_portrait,
+                text: 'Use Portrait Mode (vertical)',
+              ),
+              SizedBox(height: 8),
+              _TipRow(
+                icon: Icons.wb_sunny_outlined,
+                text: 'Face the light (avoid backlighting)',
+              ),
+              SizedBox(height: 8),
+              _TipRow(
+                icon: Icons.clear_all,
+                text: 'Clear space (no furniture blocking)',
+              ),
             ],
           ),
           

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/app_colors.dart';
 import '../models/workout_data.dart';
+import '../screens/custom_workouts_screen.dart';
 
 /// Modal for selecting a workout from the library
 class WorkoutLibraryModal extends StatefulWidget {
@@ -12,7 +13,7 @@ class WorkoutLibraryModal extends StatefulWidget {
 }
 
 class _WorkoutLibraryModalState extends State<WorkoutLibraryModal> {
-  String _selectedCategory = 'all';
+  String _selectedCategory = 'gym';
 
   @override
   Widget build(BuildContext context) {
@@ -64,10 +65,9 @@ class _WorkoutLibraryModalState extends State<WorkoutLibraryModal> {
 
   Widget _buildCategoryTabs() {
     final categories = [
-      {'id': 'all', 'label': 'ALL', 'icon': '💯'},
-      {'id': 'splits', 'label': 'MUSCLE SPLITS', 'icon': '💪'},
-      {'id': 'circuits', 'label': 'CIRCUITS', 'icon': '⚡'},
-      {'id': 'training', 'label': 'TRAINING', 'icon': '🏋️'},
+      {'id': 'gym', 'label': 'GYM TRAINING', 'icon': '💪'},
+      {'id': 'home', 'label': 'HOME TRAINING', 'icon': '🏠'},
+      {'id': 'custom', 'label': 'CUSTOM', 'icon': '✨'},
     ];
 
     return SizedBox(
@@ -86,6 +86,17 @@ class _WorkoutLibraryModalState extends State<WorkoutLibraryModal> {
                 _selectedCategory = category['id'] as String;
               });
               HapticFeedback.selectionClick();
+              
+              // If CUSTOM is selected, navigate to custom workouts screen
+              if (category['id'] == 'custom') {
+                Navigator.pop(context); // Close modal first
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CustomWorkoutsScreen(),
+                  ),
+                );
+              }
             },
             child: Container(
               margin: const EdgeInsets.only(right: 12),
@@ -143,8 +154,9 @@ class _WorkoutLibraryModalState extends State<WorkoutLibraryModal> {
   List<Map<String, dynamic>> _getWorkoutsForCategory() {
     final List<Map<String, dynamic>> allWorkouts = [];
 
-    // Add muscle splits
-    if (_selectedCategory == 'all' || _selectedCategory == 'splits') {
+    // GYM TRAINING: Show all gym presets (muscle splits, circuits, training splits)
+    if (_selectedCategory == 'gym') {
+      // Add muscle splits
       WorkoutData.muscleSplits.forEach((key, exercises) {
         allWorkouts.add({
           'type': 'split',
@@ -155,10 +167,8 @@ class _WorkoutLibraryModalState extends State<WorkoutLibraryModal> {
           'difficulty': 'Intermediate',
         });
       });
-    }
 
-    // Add circuits
-    if (_selectedCategory == 'all' || _selectedCategory == 'circuits') {
+      // Add circuits
       for (final circuit in WorkoutData.circuits) {
         allWorkouts.add({
           'type': 'circuit',
@@ -169,10 +179,8 @@ class _WorkoutLibraryModalState extends State<WorkoutLibraryModal> {
           'difficulty': circuit.difficulty,
         });
       }
-    }
 
-    // Add training splits
-    if (_selectedCategory == 'all' || _selectedCategory == 'training') {
+      // Add training splits
       for (final split in WorkoutData.trainingSplits) {
         for (final day in split.days) {
           allWorkouts.add({
@@ -185,6 +193,44 @@ class _WorkoutLibraryModalState extends State<WorkoutLibraryModal> {
           });
         }
       }
+    }
+
+    // HOME TRAINING: Show all home/bodyweight presets
+    if (_selectedCategory == 'home') {
+      // Add at-home exercises as workouts
+      final homeExercises = WorkoutData.atHomeExercises;
+      allWorkouts.add({
+        'type': 'home',
+        'id': 'home_fullbody',
+        'name': 'HOME FULL BODY',
+        'exercises': homeExercises.take(8).toList(),
+        'duration': '30 min',
+        'difficulty': 'Beginner',
+      });
+
+      // Add bodyweight circuits
+      allWorkouts.add({
+        'type': 'home',
+        'id': 'home_cardio',
+        'name': 'HOME CARDIO BLAST',
+        'exercises': ['Burpees', 'Mountain Climbers', 'Jump Squats', 'High Knees'],
+        'duration': '20 min',
+        'difficulty': 'Intermediate',
+      });
+
+      allWorkouts.add({
+        'type': 'home',
+        'id': 'home_strength',
+        'name': 'HOME STRENGTH',
+        'exercises': ['Push-ups', 'Pull-ups', 'Planks', 'Lunges', 'Squats'],
+        'duration': '25 min',
+        'difficulty': 'Beginner',
+      });
+    }
+
+    // CUSTOM: No workouts shown here, handled by navigation
+    if (_selectedCategory == 'custom') {
+      // Empty - custom tab navigates to CustomWorkoutsScreen
     }
 
     return allWorkouts;

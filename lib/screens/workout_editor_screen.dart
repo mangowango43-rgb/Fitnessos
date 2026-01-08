@@ -371,6 +371,36 @@ class _WorkoutEditorScreenState extends ConsumerState<WorkoutEditorScreen> {
                         },
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildControlRow(
+                        label: 'REST',
+                        value: exercise.restSeconds ?? 60,
+                        suffix: 's',
+                        onDecrement: () {
+                          final current = exercise.restSeconds ?? 60;
+                          if (current > 15) {
+                            setState(() {
+                              _exercises[index] = exercise.copyWith(
+                                restSeconds: current - 15,
+                              );
+                            });
+                            HapticFeedback.lightImpact();
+                          }
+                        },
+                        onIncrement: () {
+                          final current = exercise.restSeconds ?? 60;
+                          if (current < 180) {
+                            setState(() {
+                              _exercises[index] = exercise.copyWith(
+                                restSeconds: current + 15,
+                              );
+                            });
+                            HapticFeedback.lightImpact();
+                          }
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ],

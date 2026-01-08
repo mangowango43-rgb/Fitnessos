@@ -28,7 +28,20 @@ class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
     
     // Schedule alarm if enabled
     if (schedule.hasAlarm && schedule.scheduledTime != null) {
-      await WorkoutAlarmService.scheduleWorkoutAlarm(schedule);
+      // Parse time string "HH:mm" to TimeOfDay
+      final timeParts = schedule.scheduledTime!.split(':');
+      if (timeParts.length == 2) {
+        final time = TimeOfDay(
+          hour: int.parse(timeParts[0]),
+          minute: int.parse(timeParts[1]),
+        );
+        await WorkoutAlarmService.scheduleWorkoutAlarm(
+          workoutId: schedule.id,
+          workoutName: schedule.workoutName,
+          time: time,
+          repeatDays: [], // Single-day schedule, no repeat
+        );
+      }
     }
     
     await loadSchedules();

@@ -10,6 +10,7 @@ import '../../widgets/glow_button.dart';
 import '../../widgets/exercise_animation_widget.dart';
 import '../../providers/workout_provider.dart';
 import '../workout_editor_screen.dart';
+import '../custom_workouts_screen.dart';
 import '../home_screen.dart' show TabNavigator;
 
 class WorkoutsTab extends ConsumerStatefulWidget {
@@ -54,7 +55,7 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Lock a workout to start training',
+                'Commit a workout to start training',
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.white50,
@@ -67,6 +68,9 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
         
         // GYM/HOME Toggle
         _buildModeToggle(),
+        
+        // CUSTOM WORKOUTS Button
+        _buildCustomWorkoutsButton(),
         
         // Category Cards
         Expanded(
@@ -98,6 +102,67 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
             child: _buildToggleButton('HOME', 'home'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomWorkoutsButton() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(60, 0, 60, 20),
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CustomWorkoutsScreen(),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.cyberLime.withOpacity(0.15),
+                AppColors.electricCyan.withOpacity(0.15),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.cyberLime.withOpacity(0.5),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.cyberLime.withOpacity(0.2),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '✨',
+                style: TextStyle(fontSize: 22),
+              ),
+              SizedBox(width: 12),
+              Text(
+                'CUSTOM WORKOUTS',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -417,12 +482,12 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
           ),
           const SizedBox(height: 12),
 
-          // Exercise count and duration
+          // Exercise count and calories
           Row(
             children: [
               _buildInfoBadge('${includedExercises.length} exercises'),
               const SizedBox(width: 8),
-              _buildInfoBadge('~${preset.estimatedMinutes} min'),
+              _buildInfoBadge('🔥 ~${preset.estimatedCalories} cal'),
               if (preset.isCircuit && preset.rounds != null) ...[
                 const SizedBox(width: 8),
                 _buildInfoBadge('${preset.rounds} rounds'),
@@ -477,14 +542,14 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
 
           const SizedBox(height: 20),
 
-          // LOCK and EDIT buttons
+          // COMMIT and EDIT buttons
           Row(
             children: [
               Expanded(
                 flex: 2,
                 child: GlowButton(
-                  text: '🔒 LOCK',
-                  onPressed: () => _lockWorkout(preset),
+                  text: '✅ COMMIT',
+                  onPressed: () => _commitWorkout(preset),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   fontSize: 14,
                 ),
@@ -546,11 +611,11 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
     );
   }
 
-  Future<void> _lockWorkout(WorkoutPreset preset) async {
+  Future<void> _commitWorkout(WorkoutPreset preset) async {
     HapticFeedback.mediumImpact();
     
-    // Lock the workout
-    await ref.read(lockedWorkoutProvider.notifier).lockWorkout(preset);
+    // Commit the workout
+    await ref.read(committedWorkoutProvider.notifier).commitWorkout(preset);
     
     // Show confirmation
     if (mounted) {
@@ -558,10 +623,10 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.lock, color: AppColors.cyberLime),
+              const Icon(Icons.check_circle, color: AppColors.cyberLime),
               const SizedBox(width: 12),
               Text(
-                'Workout Locked! 🔒',
+                'Workout Committed! ✅',
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -579,7 +644,7 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
         ),
       );
       
-      // Navigate to home tab to show the locked workout in hero card
+      // Navigate to home tab to show the committed workout in hero card
       final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
       if (navigator != null) {
         (navigator as dynamic).changeTab(0); // Home tab

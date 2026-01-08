@@ -108,6 +108,56 @@ class WorkoutPreset {
     return totalMinutes;
   }
 
+  int get estimatedCalories {
+    int totalCalories = 0;
+    
+    for (final exercise in exercises) {
+      if (!exercise.included) continue;
+      
+      // Calorie estimates per set based on exercise intensity
+      int caloriesPerSet = _getCaloriesPerSet(exercise.name);
+      
+      if (isCircuit && exercise.timeSeconds != null) {
+        // Circuit: estimate based on time (6 cal/min avg for circuits)
+        totalCalories += ((exercise.timeSeconds! / 60) * 6 * (rounds ?? 1)).round();
+      } else {
+        // Regular workout: sets × calorie coefficient
+        totalCalories += exercise.sets * caloriesPerSet;
+      }
+    }
+    
+    return totalCalories;
+  }
+
+  int _getCaloriesPerSet(String exerciseName) {
+    final name = exerciseName.toLowerCase();
+    
+    // High intensity compound movements (10-12 cal/set)
+    if (name.contains('squat') || name.contains('deadlift') || 
+        name.contains('clean') || name.contains('snatch') ||
+        name.contains('thruster') || name.contains('burpee')) {
+      return 12;
+    }
+    
+    // Medium-high compound (8-10 cal/set)
+    if (name.contains('bench press') || name.contains('overhead press') ||
+        name.contains('military press') || name.contains('row') ||
+        name.contains('pull-up') || name.contains('chin-up') ||
+        name.contains('lunge') || name.contains('leg press')) {
+      return 9;
+    }
+    
+    // Medium intensity (6-8 cal/set)
+    if (name.contains('dip') || name.contains('push-up') ||
+        name.contains('cable') || name.contains('machine') ||
+        name.contains('leg curl') || name.contains('leg extension')) {
+      return 7;
+    }
+    
+    // Isolation/lower intensity (4-6 cal/set)
+    return 5;
+  }
+
   WorkoutPreset copyWith({
     String? id,
     String? name,
@@ -181,6 +231,51 @@ class LockedWorkout {
     required this.isCircuit,
     this.rounds,
   });
+
+  int get estimatedCalories {
+    int totalCalories = 0;
+    
+    for (final exercise in exercises) {
+      int caloriesPerSet = _getCaloriesPerSet(exercise.name);
+      
+      if (isCircuit && exercise.timeSeconds != null) {
+        totalCalories += ((exercise.timeSeconds! / 60) * 6 * (rounds ?? 1)).round();
+      } else {
+        totalCalories += exercise.sets * caloriesPerSet;
+      }
+    }
+    
+    return totalCalories;
+  }
+
+  int _getCaloriesPerSet(String exerciseName) {
+    final name = exerciseName.toLowerCase();
+    
+    if (name.contains('squat') || name.contains('deadlift') || 
+        name.contains('clean') || name.contains('snatch') ||
+        name.contains('thruster') || name.contains('burpee')) {
+      return 12;
+    }
+    
+    if (name.contains('bench press') || name.contains('overhead press') ||
+        name.contains('military press') || name.contains('row') ||
+        name.contains('pull-up') || name.contains('chin-up') ||
+        name.contains('lunge') || name.contains('leg press')) {
+      return 9;
+    }
+    
+    if (name.contains('dip') || name.contains('push-up') ||
+        name.contains('cable') || name.contains('machine') ||
+        name.contains('leg curl') || name.contains('leg extension')) {
+      return 7;
+    }
+    
+    return 5;
+  }
+
+  int get totalSets {
+    return exercises.fold(0, (sum, exercise) => sum + exercise.sets);
+  }
 
   factory LockedWorkout.fromPreset(WorkoutPreset preset, {List<WorkoutExercise>? customExercises}) {
     final includedExercises = (customExercises ?? preset.exercises)
