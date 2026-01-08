@@ -121,13 +121,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
                         const SizedBox(height: 16),
 
-                        // ═══════════════════════════════════════════════
-                        // DATE STRIP: Horizontal scrollable week view
-                        // ═══════════════════════════════════════════════
-                        _buildDateStrip(),
-
-                        const SizedBox(height: 20),
-
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Column(
@@ -215,7 +208,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               const SizedBox(width: 8),
               // App Name (LIME GREEN)
               const Text(
-                'Skelatal--PT',
+                'Skelatal-PT',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -700,33 +693,51 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   // Action Buttons: ALARM + START + EDIT
                   Row(
                     children: [
-                      // ALARM Button - Opens schedule modal
+                      // ALARM Button - Opens schedule modal to set alarm for selected date
                       GestureDetector(
                         onTap: () async {
                           HapticFeedback.mediumImpact();
-                          // Show schedule modal
-                          final result = await showModalBottomSheet<Map<String, dynamic>>(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (context) => ScheduleWorkoutModal(
-                              selectedDate: _selectedDate,
-                            ),
-                          );
-                          
-                          if (result != null && mounted) {
-                            // Schedule the alarm for the current workout
-                            if (displayWorkout != null && result['time'] != null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Alarm set for ${(result['time'] as TimeOfDay).format(context)}! ⏰'
-                                  ),
-                                  backgroundColor: AppColors.cyberLime,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
+                          // If there's already a workout on this date, allow setting alarm for it
+                          // Otherwise, let them schedule a new workout
+                          if (displayWorkout != null) {
+                            // Show schedule modal to set time
+                            final result = await showModalBottomSheet<Map<String, dynamic>>(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => ScheduleWorkoutModal(
+                                selectedDate: _selectedDate,
+                              ),
+                            );
+                            
+                            if (result != null && mounted) {
+                              final timeData = result['time'] as TimeOfDay?;
+                              final hasAlarm = result['hasAlarm'] as bool;
+                              
+                              if (hasAlarm && timeData != null) {
+                                // Update the existing schedule with alarm info
+                                if (displayWorkout is WorkoutSchedule) {
+                                  final updatedSchedule = displayWorkout.copyWith(
+                                    hasAlarm: true,
+                                    scheduledTime: '${timeData.hour.toString().padLeft(2, '0')}:${timeData.minute.toString().padLeft(2, '0')}',
+                                  );
+                                  await ref.read(workoutSchedulesProvider.notifier).saveSchedule(updatedSchedule);
+                                }
+                                
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Alarm set for ${timeData.format(context)}! ⏰'),
+                                      backgroundColor: AppColors.cyberLime,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
                             }
+                          } else {
+                            // No workout on this date, open full schedule flow
+                            await _openScheduleWorkoutFlow(_selectedDate);
                           }
                         },
                         child: Container(
