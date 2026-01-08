@@ -1261,7 +1261,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // SCHEDULING METHODS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Open workout library to swap hero workout
+  /// Open workout library to schedule workout for selected date
   Future<void> _openWorkoutLibrary() async {
     final selected = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -1271,25 +1271,50 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     );
 
     if (selected != null && mounted) {
-      // Create workout preset from selected data
-      final preset = WorkoutPreset(
-        id: selected['id'] as String,
-        name: selected['name'] as String,
-        category: 'gym',
-        subcategory: selected['type'] as String? ?? 'gym',
-        exercises: [], // Will be populated from workout data
-        isCircuit: false,
-        duration: selected['duration'] as String?,
+      // Create a schedule for the selected date
+      final schedule = WorkoutSchedule(
+        id: '${DateTime.now().millisecondsSinceEpoch}_${_selectedDate.millisecondsSinceEpoch}',
+        workoutId: selected['id'] as String,
+        workoutName: selected['name'] as String,
+        scheduledDate: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+        scheduledTime: null, // No time set yet
+        hasAlarm: false,
+        createdAt: DateTime.now(),
       );
       
-      await ref
-          .read(committedWorkoutProvider.notifier)
-          .commitWorkout(preset);
+      // Save schedule to database
+      await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
+      
+      // Only commit to global provider if scheduling for TODAY
+      final now = DateTime.now();
+      final isToday = _selectedDate.year == now.year &&
+                      _selectedDate.month == now.month &&
+                      _selectedDate.day == now.day;
+      
+      if (isToday) {
+        // Create workout preset for immediate commit
+        final preset = WorkoutPreset(
+          id: selected['id'] as String,
+          name: selected['name'] as String,
+          category: 'gym',
+          subcategory: selected['type'] as String? ?? 'gym',
+          exercises: [], // Will be populated from workout data
+          isCircuit: false,
+          duration: selected['duration'] as String?,
+        );
+        
+        await ref
+            .read(committedWorkoutProvider.notifier)
+            .commitWorkout(preset);
+      }
       
       if (mounted) {
+        final dateStr = isToday 
+            ? 'today'
+            : '${_selectedDate.month}/${_selectedDate.day}';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Workout Committed! ✅ "${selected['name']}"'),
+            content: Text('✅ ${selected['name']} scheduled for $dateStr!'),
             backgroundColor: AppColors.cyberLime,
             behavior: SnackBarBehavior.floating,
           ),

@@ -184,6 +184,94 @@ class WorkoutAlarmService {
     }
   }
 
+  /// Schedule ONE-TIME alarm for a specific date and time (not recurring)
+  static Future<void> scheduleOneTimeWorkoutAlarm({
+    required String workoutId,
+    required String workoutName,
+    required DateTime scheduledDate,
+    required TimeOfDay time,
+  }) async {
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🔔 scheduleOneTimeWorkoutAlarm called for "$workoutName"');
+      debugPrint('   - date: ${scheduledDate.year}-${scheduledDate.month}-${scheduledDate.day}');
+      debugPrint('   - time: ${time.hour}:${time.minute}');
+      
+      final alarmId = workoutId.hashCode.abs() % 2147483647;
+      
+      // Create exact datetime for the alarm
+      final scheduledDateTime = tz.TZDateTime(
+        tz.local,
+        scheduledDate.year,
+        scheduledDate.month,
+        scheduledDate.day,
+        time.hour,
+        time.minute,
+      );
+      
+      debugPrint('   - scheduledDateTime: $scheduledDateTime');
+      debugPrint('   - alarmId: $alarmId');
+      
+      // Only schedule if in the future
+      if (scheduledDateTime.isBefore(tz.TZDateTime.now(tz.local))) {
+        debugPrint('⏰ Skipped: scheduled time is in the past');
+        return;
+      }
+      
+      await _notifications.zonedSchedule(
+        alarmId,
+        '🔥 Workout Time: $workoutName',
+        '${_getMotivationalQuote()}\n\nTap to start your workout!',
+        scheduledDateTime,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+            fullScreenIntent: true,
+            ongoing: false,
+            autoCancel: true,
+            largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+            styleInformation: const BigTextStyleInformation(
+              '',
+              contentTitle: '🔥 Workout Time',
+              summaryText: 'FitnessOS',
+            ),
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentSound: true,
+            presentBadge: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: workoutId,
+      );
+      
+      debugPrint('   ✅ SUCCESS: One-time alarm scheduled');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Track this alarm
+      _scheduledAlarms[alarmId] = {
+        'workoutName': workoutName,
+        'workoutId': workoutId,
+        'scheduledDate': scheduledDate.toIso8601String(),
+        'time': '${time.hour}:${time.minute}',
+        'scheduledAt': scheduledDateTime.toIso8601String(),
+      };
+    } catch (e, stack) {
+      debugPrint('❌ scheduleOneTimeWorkoutAlarm error: $e');
+      debugPrint('Stack: $stack');
+    }
+  }
+
   /// Cancel all alarms for a workout
   static Future<void> cancelWorkoutAlarm(String workoutId) async {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

@@ -37,14 +37,12 @@ class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
           minute: int.parse(timeParts[1]),
         );
         
-        // Get the day of week for the scheduled date (0 = Sunday, 6 = Saturday)
-        final dayOfWeek = schedule.scheduledDate.weekday % 7; // Convert from DateTime's 1-7 (Mon-Sun) to 0-6 (Sun-Sat)
-        
-        await WorkoutAlarmService.scheduleWorkoutAlarm(
+        // Use ONE-TIME alarm for specific date, not recurring weekly alarm
+        await WorkoutAlarmService.scheduleOneTimeWorkoutAlarm(
           workoutId: schedule.id,
           workoutName: schedule.workoutName,
+          scheduledDate: schedule.scheduledDate,
           time: time,
-          repeatDays: [dayOfWeek], // Schedule for the specific day of week
         );
       }
     }
