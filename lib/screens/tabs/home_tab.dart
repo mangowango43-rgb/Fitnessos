@@ -477,52 +477,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    workoutName.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                                // Show alarm indicator if alarm is set
-                                if (hasAlarm && scheduledTime != null)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.cyberLime.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: AppColors.cyberLime,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.alarm,
-                                          color: AppColors.cyberLime,
-                                          size: 12,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          scheduledTime,
-                                          style: const TextStyle(
-                                            color: AppColors.cyberLime,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
+                            Text(
+                              workoutName.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -567,6 +529,44 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       ),
                     ],
                   ),
+                  
+                  // Show alarm indicator if alarm is set (positioned below workout name, slightly left)
+                  if (hasAlarm && scheduledTime != null) ...[
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.cyberLime.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.cyberLime,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.alarm,
+                              color: AppColors.cyberLime,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              scheduledTime,
+                              style: const TextStyle(
+                                color: AppColors.cyberLime,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   
                   const SizedBox(height: 20),
                   
