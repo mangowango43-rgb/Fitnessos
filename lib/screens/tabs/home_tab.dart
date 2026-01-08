@@ -657,46 +657,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(
-                                Icons.local_fire_department,
-                                color: Colors.white70,
-                                size: 20,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${committedWorkout.estimatedMinutes * 7}', // Rough calorie estimate
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              Text(
-                                'CALORIES',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   
@@ -705,11 +665,34 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   // Action Buttons: ALARM + START + EDIT
                   Row(
                     children: [
-                      // ALARM Button
+                      // ALARM Button - Opens schedule modal
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
                           HapticFeedback.mediumImpact();
-                          _showWorkoutAlarmPicker(context, committedWorkout);
+                          // Show schedule modal
+                          final result = await showModalBottomSheet<Map<String, dynamic>>(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => ScheduleWorkoutModal(
+                              selectedDate: _selectedDate,
+                            ),
+                          );
+                          
+                          if (result != null && mounted) {
+                            // Schedule the alarm for the current workout
+                            if (committedWorkout != null && result['time'] != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Alarm set for ${(result['time'] as TimeOfDay).format(context)}! ⏰'
+                                  ),
+                                  backgroundColor: AppColors.cyberLime,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.all(14),
@@ -771,24 +754,12 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       
                       const SizedBox(width: 10),
                       
-                      // EDIT Button
+                      // EDIT Button - Opens workout library
                       GestureDetector(
                         onTap: () async {
                           HapticFeedback.mediumImpact();
-                          // Show schedule modal first
-                          final result = await showModalBottomSheet<Map<String, dynamic>>(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (context) => ScheduleWorkoutModal(
-                              selectedDate: _selectedDate,
-                            ),
-                          );
-                          
-                          if (result != null && mounted) {
-                            // Then show workout library
-                            await _openWorkoutLibraryWithSchedule(result);
-                          }
+                          // Show workout library to choose different workout
+                          await _openWorkoutLibrary();
                         },
                         child: Container(
                           padding: const EdgeInsets.all(14),
@@ -1281,52 +1252,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     }
   }
 
-  Future<void> _openWorkoutLibraryWithSchedule(Map<String, dynamic> scheduleInfo) async {
-    final selected = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const WorkoutLibraryModal(),
-    );
-
-    if (selected != null && mounted) {
-      // Create workout preset from selected data
-      final preset = WorkoutPreset(
-        id: selected['id'] as String,
-        name: selected['name'] as String,
-        category: 'gym',
-        subcategory: selected['type'] as String? ?? 'gym',
-        exercises: [], // Will be populated from workout data
-        isCircuit: false,
-        duration: selected['duration'] as String?,
-      );
-      
-      // Schedule the workout with alarm info
-      await ref.read(committedWorkoutProvider.notifier).scheduleWorkout(
-        _selectedDate,
-        preset,
-        alarmTime: scheduleInfo['time'],
-        repeatDays: scheduleInfo['repeatDays'] ?? [],
-      );
-      
-      // Also commit it as the current workout
-      await ref.read(committedWorkoutProvider.notifier).commitWorkout(preset);
-      
-      if (mounted) {
-        final timeStr = scheduleInfo['time'] != null
-            ? ' with alarm at ${(scheduleInfo['time'] as TimeOfDay).format(context)}'
-            : '';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Workout Scheduled! 🔥 "${selected['name']}"$timeStr'),
-            backgroundColor: AppColors.cyberLime,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
 
   /// Open schedule workout flow (date long-press)
   Future<void> _openScheduleWorkoutFlow(DateTime date) async {
@@ -1386,143 +1311,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // ═══════════════════════════════════════════════════════════════════════════
   // WORKOUT ALARM PICKER
   // ═══════════════════════════════════════════════════════════════════════════
-  void _showWorkoutAlarmPicker(BuildContext context, dynamic workout) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.cyberBlack,
-              AppColors.cyberBlack.withOpacity(0.95),
-            ],
-          ),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(32),
-            topRight: Radius.circular(32),
-          ),
-          border: Border.all(
-            color: AppColors.electricCyan.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.white30,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.alarm,
-                  color: AppColors.electricCyan,
-                  size: 28,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Set Workout Reminder',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              workout.name,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.white70,
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Time selection would go here
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.white10,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppColors.white20,
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.schedule,
-                    color: AppColors.electricCyan,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Alarm feature coming soon! 🔔',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'We\'re building a smart reminder system\nto help you stay consistent',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.white60,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-                HapticFeedback.lightImpact();
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.electricCyan,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Center(
-                  child: Text(
-                    'GOT IT',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
   
   // ═══════════════════════════════════════════════════════════════════════════
   // STREAK ACHIEVEMENTS MODAL

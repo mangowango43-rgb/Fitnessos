@@ -114,15 +114,17 @@ class WorkoutPreset {
     for (final exercise in exercises) {
       if (!exercise.included) continue;
       
-      // Calorie estimates per set based on exercise intensity
+      // Calorie estimates based on exercise intensity and volume
       int caloriesPerSet = _getCaloriesPerSet(exercise.name);
       
       if (isCircuit && exercise.timeSeconds != null) {
         // Circuit: estimate based on time (6 cal/min avg for circuits)
         totalCalories += ((exercise.timeSeconds! / 60) * 6 * (rounds ?? 1)).round();
       } else {
-        // Regular workout: sets × calorie coefficient
-        totalCalories += exercise.sets * caloriesPerSet;
+        // Regular workout: sets × (reps/10) × calorie coefficient
+        // This accounts for both sets and reps in the total volume
+        final repMultiplier = (exercise.reps / 10).clamp(0.5, 2.0);
+        totalCalories += (exercise.sets * caloriesPerSet * repMultiplier).round();
       }
     }
     
@@ -241,7 +243,9 @@ class LockedWorkout {
       if (isCircuit && exercise.timeSeconds != null) {
         totalCalories += ((exercise.timeSeconds! / 60) * 6 * (rounds ?? 1)).round();
       } else {
-        totalCalories += exercise.sets * caloriesPerSet;
+        // Regular workout: sets × (reps/10) × calorie coefficient
+        final repMultiplier = (exercise.reps / 10).clamp(0.5, 2.0);
+        totalCalories += (exercise.sets * caloriesPerSet * repMultiplier).round();
       }
     }
     

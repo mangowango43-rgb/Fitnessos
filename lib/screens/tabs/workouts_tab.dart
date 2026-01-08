@@ -108,7 +108,16 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
 
   Widget _buildCustomWorkoutsButton() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(60, 0, 60, 20),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.white5,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.white10,
+          width: 1,
+        ),
+      ),
       child: GestureDetector(
         onTap: () {
           HapticFeedback.mediumImpact();
@@ -119,48 +128,30 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
             ),
           );
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.cyberLime.withOpacity(0.15),
-                AppColors.electricCyan.withOpacity(0.15),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.cyberLime.withOpacity(0.5),
-              width: 2,
-            ),
+            color: AppColors.cyberLime,
+            borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cyberLime.withOpacity(0.2),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: AppColors.cyberLime.withOpacity(0.4),
+                blurRadius: 20,
+                spreadRadius: 0,
               ),
             ],
           ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '✨',
-                style: TextStyle(fontSize: 22),
+          child: const Center(
+            child: Text(
+              '✨ CUSTOM WORKOUTS',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+                color: Colors.black,
               ),
-              SizedBox(width: 12),
-              Text(
-                'CUSTOM WORKOUTS',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -169,6 +160,15 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
 
   Widget _buildToggleButton(String label, String mode) {
     final isActive = _selectedMode == mode;
+    
+    // Get appropriate icon for each mode
+    IconData icon;
+    if (mode == 'gym') {
+      icon = Icons.fitness_center;
+    } else {
+      icon = Icons.home;
+    }
+    
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -194,14 +194,25 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
               : null,
         ),
         child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.5,
-              color: isActive ? Colors.black : AppColors.white60,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isActive ? Colors.black : AppColors.white60,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                  color: isActive ? Colors.black : AppColors.white60,
+                ),
+              ),
+            ],
           ),
         ),
       ),
