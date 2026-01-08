@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../utils/app_colors.dart';
 import '../../providers/stats_provider.dart';
 import '../../providers/workout_provider.dart';
@@ -8,6 +9,7 @@ import '../../providers/workout_schedule_provider.dart';
 import '../../models/workout_schedule.dart';
 import '../../models/workout_models.dart';
 import '../../services/storage_service.dart';
+import '../../services/workout_alarm_service.dart';
 import '../../widgets/animated_counter.dart';
 import '../../widgets/schedule_workout_modal.dart';
 import '../../widgets/workout_library_modal.dart';
@@ -126,13 +128,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                           child: Column(
                             children: [
                               // ═══════════════════════════════════════════════
-                              // HERO WORKOUT CARD: Today's scheduled workout
-                              // ═══════════════════════════════════════════════
-                              _buildHeroWorkoutCard(context, ref, displayWorkout),
-
-                              const SizedBox(height: 20),
-
-                              // ═══════════════════════════════════════════════
                               // DATE STRIP: Workout scheduling
                               // ═══════════════════════════════════════════════
                               WorkoutDateStrip(
@@ -142,6 +137,13 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                                 },
                                 accentColor: AppColors.cyberLime,
                               ),
+
+                              const SizedBox(height: 20),
+
+                              // ═══════════════════════════════════════════════
+                              // HERO WORKOUT CARD: Today's scheduled workout
+                              // ═══════════════════════════════════════════════
+                              _buildHeroWorkoutCard(context, ref, displayWorkout),
 
                               const SizedBox(height: 20),
 
@@ -1345,7 +1347,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
     if (selectedWorkout != null && mounted) {
       final timeData = result['time'] as TimeOfDay?;
-      final hasAlarm = result['hasAlarm'] as bool;
+      final hasAlarm = timeData != null;
 
       // Create schedule
       final schedule = WorkoutSchedule(
@@ -1364,15 +1366,72 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
 
       if (mounted) {
+        final dateStr = DateFormat('MMM d').format(date);
+        final timeStr = timeData?.format(context);
+        
+        // Show enhanced confirmation snackbar
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              hasAlarm 
-                  ? '✅ ${selectedWorkout['name']} scheduled with alarm!'
-                  : '✅ ${selectedWorkout['name']} scheduled!',
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '✅ ${selectedWorkout['name']} scheduled!',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+                if (hasAlarm) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '⏰ Alarm set for $dateStr at $timeStr',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ],
             ),
             backgroundColor: AppColors.cyberLime,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            action: hasAlarm ? SnackBarAction(
+              label: 'TEST',
+              textColor: Colors.black,
+              onPressed: () => _scheduleTestAlarm(),
+            ) : null,
+          ),
+        );
+      }
+    }
+  }
+  
+  /// Schedule a test alarm that fires in 1 minute
+  Future<void> _scheduleTestAlarm() async {
+    try {
+      await WorkoutAlarmService.scheduleTestAlarm();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🧪 Test alarm scheduled for 1 minute from now!'),
+            backgroundColor: AppColors.electricCyan,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to schedule test alarm: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Test alarm failed: $e'),
+            backgroundColor: AppColors.neonCrimson,
+            duration: const Duration(seconds: 3),
           ),
         );
       }

@@ -25,29 +25,75 @@ class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
 
   /// Add or update a schedule
   Future<void> saveSchedule(WorkoutSchedule schedule) async {
-    await _db.saveSchedule(schedule);
-    
-    // Schedule alarm if enabled
-    if (schedule.hasAlarm && schedule.scheduledTime != null) {
-      // Parse time string "HH:mm" to TimeOfDay
-      final timeParts = schedule.scheduledTime!.split(':');
-      if (timeParts.length == 2) {
-        final time = TimeOfDay(
-          hour: int.parse(timeParts[0]),
-          minute: int.parse(timeParts[1]),
-        );
+    try {
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('💾 Saving workout schedule: ${schedule.workoutName}');
+      debugPrint('   - Date: ${schedule.scheduledDate}');
+      debugPrint('   - Has Alarm: ${schedule.hasAlarm}');
+      debugPrint('   - Time: ${schedule.scheduledTime ?? "N/A"}');
+      
+      await _db.saveSchedule(schedule);
+      debugPrint('   ✅ Schedule saved to database');
+      
+      // Schedule alarm if enabled
+      if (schedule.hasAlarm && schedule.scheduledTime != null) {
+        debugPrint('   🔔 Attempting to schedule alarm...');
         
-        // Use ONE-TIME alarm for specific date, not recurring weekly alarm
-        await WorkoutAlarmService.scheduleOneTimeWorkoutAlarm(
-          workoutId: schedule.id,
-          workoutName: schedule.workoutName,
-          scheduledDate: schedule.scheduledDate,
-          time: time,
-        );
+        // Check if alarm service is initialized
+        if (!WorkoutAlarmService.isInitialized()) {
+          debugPrint('   ❌ Alarm service not initialized!');
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          await loadSchedules();
+          return;
+        }
+        
+        // Check permissions
+        final hasPerms = await WorkoutAlarmService.hasPermissions();
+        if (!hasPerms) {
+          debugPrint('   ⚠️ Missing alarm permissions, requesting...');
+          final granted = await WorkoutAlarmService.requestPermissions();
+          if (!granted) {
+            debugPrint('   ❌ User denied permissions. Alarm not scheduled.');
+            debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            await loadSchedules();
+            return;
+          }
+        }
+        
+        // Parse time string "HH:mm" to TimeOfDay
+        final timeParts = schedule.scheduledTime!.split(':');
+        if (timeParts.length == 2) {
+          try {
+            final time = TimeOfDay(
+              hour: int.parse(timeParts[0]),
+              minute: int.parse(timeParts[1]),
+            );
+            
+            // Use ONE-TIME alarm for specific date, not recurring weekly alarm
+            await WorkoutAlarmService.scheduleOneTimeWorkoutAlarm(
+              workoutId: schedule.id,
+              workoutName: schedule.workoutName,
+              scheduledDate: schedule.scheduledDate,
+              time: time,
+            );
+            
+            debugPrint('   ✅ Alarm scheduling completed');
+          } catch (e) {
+            debugPrint('   ❌ Failed to schedule alarm: $e');
+          }
+        } else {
+          debugPrint('   ❌ Invalid time format: ${schedule.scheduledTime}');
+        }
       }
+      
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      await loadSchedules();
+    } catch (e, stack) {
+      debugPrint('❌ Error saving schedule: $e');
+      debugPrint('Stack: $stack');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      rethrow;
     }
-    
-    await loadSchedules();
   }
 
   /// Delete a schedule

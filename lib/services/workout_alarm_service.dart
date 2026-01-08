@@ -197,6 +197,19 @@ class WorkoutAlarmService {
       debugPrint('   - date: ${scheduledDate.year}-${scheduledDate.month}-${scheduledDate.day}');
       debugPrint('   - time: ${time.hour}:${time.minute}');
       
+      // Check permissions first
+      final hasPerms = await hasPermissions();
+      if (!hasPerms) {
+        debugPrint('❌ FAILED: Missing permissions!');
+        debugPrint('   Requesting permissions now...');
+        final granted = await requestPermissions();
+        if (!granted) {
+          debugPrint('❌ CRITICAL: User denied permissions. Alarm cannot be scheduled.');
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          return;
+        }
+      }
+      
       final alarmId = workoutId.hashCode.abs() % 2147483647;
       
       // Create exact datetime for the alarm
@@ -209,12 +222,19 @@ class WorkoutAlarmService {
         time.minute,
       );
       
+      final now = tz.TZDateTime.now(tz.local);
+      final timeDiff = scheduledDateTime.difference(now);
+      
       debugPrint('   - scheduledDateTime: $scheduledDateTime');
+      debugPrint('   - currentTime: $now');
+      debugPrint('   - timeDifference: ${timeDiff.inHours}h ${timeDiff.inMinutes % 60}m');
       debugPrint('   - alarmId: $alarmId');
       
       // Only schedule if in the future
-      if (scheduledDateTime.isBefore(tz.TZDateTime.now(tz.local))) {
-        debugPrint('⏰ Skipped: scheduled time is in the past');
+      if (scheduledDateTime.isBefore(now)) {
+        debugPrint('⏰ SKIPPED: Scheduled time is in the past');
+        debugPrint('   (scheduled: $scheduledDateTime, now: $now)');
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         return;
       }
       
@@ -256,6 +276,12 @@ class WorkoutAlarmService {
       );
       
       debugPrint('   ✅ SUCCESS: One-time alarm scheduled');
+      debugPrint('   ⏰ Will fire in ${timeDiff.inHours}h ${timeDiff.inMinutes % 60}m');
+      
+      // Verify it was scheduled
+      final pending = await _notifications.pendingNotificationRequests();
+      final found = pending.any((n) => n.id == alarmId);
+      debugPrint('   🔍 Verification: ${found ? "✅ Alarm found in system" : "❌ Alarm NOT found in system!"}');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // Track this alarm
@@ -269,6 +295,7 @@ class WorkoutAlarmService {
     } catch (e, stack) {
       debugPrint('❌ scheduleOneTimeWorkoutAlarm error: $e');
       debugPrint('Stack: $stack');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }
 
@@ -443,6 +470,75 @@ class WorkoutAlarmService {
   /// Check if service is initialized
   static bool isInitialized() {
     return _initialized;
+  }
+
+  /// Check if all required permissions are granted
+  static Future<bool> hasPermissions() async {
+    try {
+      final notifStatus = await Permission.notification.status;
+      final alarmStatus = await Permission.scheduleExactAlarm.status;
+      
+      final hasPerms = notifStatus.isGranted && alarmStatus.isGranted;
+      
+      debugPrint('🔐 Permission Check:');
+      debugPrint('   - Notification: ${notifStatus.isGranted ? "✅" : "❌"} ($notifStatus)');
+      debugPrint('   - Exact Alarm: ${alarmStatus.isGranted ? "✅" : "❌"} ($alarmStatus)');
+      debugPrint('   - Overall: ${hasPerms ? "✅ GRANTED" : "❌ MISSING"}');
+      
+      return hasPerms;
+    } catch (e) {
+      debugPrint('❌ Permission check error: $e');
+      return false;
+    }
+  }
+
+  /// Request permissions if not granted
+  static Future<bool> requestPermissions() async {
+    try {
+      debugPrint('🔐 Requesting alarm permissions...');
+      
+      final notifStatus = await Permission.notification.request();
+      final alarmStatus = await Permission.scheduleExactAlarm.request();
+      
+      final granted = notifStatus.isGranted && alarmStatus.isGranted;
+      
+      if (granted) {
+        debugPrint('✅ All permissions granted!');
+      } else {
+        debugPrint('❌ Permissions denied:');
+        if (!notifStatus.isGranted) {
+          debugPrint('   - Notification permission: $notifStatus');
+        }
+        if (!alarmStatus.isGranted) {
+          debugPrint('   - Exact alarm permission: $alarmStatus');
+        }
+      }
+      
+      return granted;
+    } catch (e) {
+      debugPrint('❌ Permission request error: $e');
+      return false;
+    }
+  }
+
+  /// Get all pending alarms from the system
+  static Future<List<Map<String, dynamic>>> getPendingAlarms() async {
+    try {
+      final pending = await _notifications.pendingNotificationRequests();
+      debugPrint('📋 Found ${pending.length} pending notifications in system');
+      
+      return pending.map((notif) {
+        return {
+          'id': notif.id,
+          'title': notif.title ?? 'Unknown',
+          'body': notif.body ?? '',
+          'payload': notif.payload ?? '',
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('❌ Error getting pending alarms: $e');
+      return [];
+    }
   }
 
   /// Get scheduled alarms for debugging

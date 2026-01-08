@@ -19,12 +19,16 @@ class ScheduleWorkoutModal extends StatefulWidget {
 class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   bool _alarmEnabled = true;
-  List<int> _selectedDays = [1, 3, 5]; // Mon, Wed, Fri by default
 
   @override
   Widget build(BuildContext context) {
+    final dateStr = DateFormat('EEEE, MMM d').format(widget.selectedDate);
+    final isToday = widget.selectedDate.year == DateTime.now().year &&
+                    widget.selectedDate.month == DateTime.now().month &&
+                    widget.selectedDate.day == DateTime.now().day;
+    
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.6,
       decoration: const BoxDecoration(
         color: Colors.black,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -40,12 +44,28 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Schedule for ${DateFormat('MMM d').format(widget.selectedDate)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Schedule Workout',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              isToday ? 'Today, $dateStr' : dateStr,
+                              style: TextStyle(
+                                color: AppColors.cyberLime,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       IconButton(
@@ -64,18 +84,40 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Info card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyberLime.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.cyberLime.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: AppColors.cyberLime, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'One-time alarm for this specific date',
+                              style: TextStyle(
+                                color: AppColors.white90,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
                     // Alarm toggle
                     _buildAlarmToggle(),
                     
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     
                     // Time picker
                     if (_alarmEnabled) _buildTimePicker(),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Repeat days selector
-                    if (_alarmEnabled) _buildRepeatDaysSelector(),
                   ],
                 ),
               ),
@@ -95,7 +137,7 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                         HapticFeedback.mediumImpact();
                         Navigator.pop(context, {
                           'time': _alarmEnabled ? _selectedTime : null,
-                          'repeatDays': _alarmEnabled ? _selectedDays : <int>[],
+                          'repeatDays': <int>[], // No repeat days for one-time alarms
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -247,75 +289,6 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRepeatDaysSelector() {
-    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white5,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Repeat Days',
-            style: TextStyle(
-              color: AppColors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(7, (index) {
-              final isSelected = _selectedDays.contains(index);
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedDays.remove(index);
-                    } else {
-                      _selectedDays.add(index);
-                    }
-                  });
-                  HapticFeedback.selectionClick();
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.cyberLime : AppColors.white10,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? AppColors.cyberLime : AppColors.white20,
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      days[index],
-                      style: TextStyle(
-                        color: isSelected ? Colors.black : AppColors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
           ),
         ],
       ),
