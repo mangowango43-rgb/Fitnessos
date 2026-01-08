@@ -714,12 +714,11 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                             
                             if (result != null && mounted) {
                               final timeData = result['time'] as TimeOfDay?;
-                              final hasAlarm = result['hasAlarm'] as bool;
                               
-                              if (hasAlarm && timeData != null) {
+                              if (timeData != null) {
                                 // Update the existing schedule with alarm info
                                 if (displayWorkout is WorkoutSchedule) {
-                                  final updatedSchedule = displayWorkout.copyWith(
+                                  final updatedSchedule = (displayWorkout as WorkoutSchedule).copyWith(
                                     hasAlarm: true,
                                     scheduledTime: '${timeData.hour.toString().padLeft(2, '0')}:${timeData.minute.toString().padLeft(2, '0')}',
                                   );
