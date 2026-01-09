@@ -1281,35 +1281,32 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         scheduledTime: null, // No time set yet
         hasAlarm: false,
         createdAt: DateTime.now(),
+        repeatDays: [], // No repeat - one-time schedule
       );
       
-      // Save schedule to database
+      // Save schedule to Hive
       await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
       
-      // Only commit to global provider if scheduling for TODAY
-      final now = DateTime.now();
-      final isToday = _selectedDate.year == now.year &&
-                      _selectedDate.month == now.month &&
-                      _selectedDate.day == now.day;
+      // ALWAYS commit to global provider when editing workout
+      final preset = WorkoutPreset(
+        id: selected['id'] as String,
+        name: selected['name'] as String,
+        category: 'gym',
+        subcategory: selected['type'] as String? ?? 'gym',
+        exercises: [], // Will be populated from workout data
+        isCircuit: false,
+        duration: selected['duration'] as String?,
+      );
       
-      if (isToday) {
-        // Create workout preset for immediate commit
-        final preset = WorkoutPreset(
-          id: selected['id'] as String,
-          name: selected['name'] as String,
-          category: 'gym',
-          subcategory: selected['type'] as String? ?? 'gym',
-          exercises: [], // Will be populated from workout data
-          isCircuit: false,
-          duration: selected['duration'] as String?,
-        );
-        
-        await ref
-            .read(committedWorkoutProvider.notifier)
-            .commitWorkout(preset);
-      }
+      await ref
+          .read(committedWorkoutProvider.notifier)
+          .commitWorkout(preset);
       
       if (mounted) {
+        final now = DateTime.now();
+        final isToday = _selectedDate.year == now.year &&
+                        _selectedDate.month == now.month &&
+                        _selectedDate.day == now.day;
         final dateStr = isToday 
             ? 'today'
             : '${_selectedDate.month}/${_selectedDate.day}';
@@ -1359,6 +1356,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             : null,
         hasAlarm: hasAlarm,
         createdAt: DateTime.now(),
+        repeatDays: [], // No repeat - one-time schedule
       );
 
       // Save schedule
