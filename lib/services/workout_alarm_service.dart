@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
+import '../models/workout_schedule.dart';
 
+/// Workout Alarm Service - Based on FutureYou's proven AlarmService
 class WorkoutAlarmService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
@@ -13,7 +15,7 @@ class WorkoutAlarmService {
   static const String _channelDescription =
       'Alarm notifications for workout reminders';
 
-  // Track scheduled alarms in memory
+  // Track scheduled alarms in memory for debugging
   static final Map<int, Map<String, dynamic>> _scheduledAlarms = {};
 
   /// Initialize alarm service - MUST be called from main()
@@ -33,7 +35,7 @@ class WorkoutAlarmService {
       final alarmStatus = await Permission.scheduleExactAlarm.request();
       debugPrint('⏰ Exact alarm permission: $alarmStatus');
 
-      // Initialize notification plugin with FitnessOS icon
+      // Initialize notification plugin
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosInit = DarwinInitializationSettings(
         requestAlertPermission: true,
@@ -67,7 +69,7 @@ class WorkoutAlarmService {
               AndroidFlutterLocalNotificationsPlugin>();
       
       await androidPlugin?.createNotificationChannel(workoutChannel);
-      debugPrint('✅ Workout notification channel created');
+      debugPrint('✅ Notification channel created');
 
       _initialized = true;
       debugPrint('🎉 WorkoutAlarmService fully initialized!');
@@ -78,250 +80,204 @@ class WorkoutAlarmService {
   }
 
   static void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('🔔 Workout notification tapped: ${response.payload}');
-    // TODO: Navigate to train tab when notification is tapped
+    debugPrint('🔔 Notification tapped: ${response.payload}');
   }
 
-  /// Schedule weekly alarms for a workout
-  static Future<void> scheduleWorkoutAlarm({
-    required String workoutId,
-    required String workoutName,
-    required TimeOfDay time,
-    required List<int> repeatDays, // 0-6 (Sunday-Saturday)
-  }) async {
-    if (repeatDays.isEmpty) {
-      debugPrint('⏰ scheduleWorkoutAlarm skipped: no repeat days for "$workoutName"');
+  /// Schedule alarm for a workout schedule using FutureYou's exact logic
+  static Future<void> scheduleAlarm(WorkoutSchedule schedule) async {
+    if (!schedule.hasAlarm) {
+      debugPrint('⏰ scheduleAlarm skipped: hasAlarm=false for "${schedule.workoutName}"');
+      return;
+    }
+
+    if (schedule.scheduledTime == null || schedule.scheduledTime!.isEmpty) {
+      debugPrint('❌ scheduleAlarm FAILED: time is EMPTY for "${schedule.workoutName}"');
       return;
     }
 
     try {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🔔 scheduleWorkoutAlarm called for "$workoutName"');
-      debugPrint('   - time: ${time.hour}:${time.minute}');
-      debugPrint('   - repeatDays: $repeatDays');
+      debugPrint('🔔 scheduleAlarm called for "${schedule.workoutName}"');
+      debugPrint('   - time: ${schedule.scheduledTime}');
+      debugPrint('   - hasAlarm: ${schedule.hasAlarm}');
+      debugPrint('   - repeatDays: ${schedule.repeatDays}');
+      debugPrint('   - scheduledDate: ${schedule.scheduledDate}');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // Cancel existing alarms so we don't duplicate notifications
-      await cancelWorkoutAlarm(workoutId);
+      await cancelAlarm(schedule.id);
 
       int successCount = 0;
       int failCount = 0;
 
-      // Schedule for each repeat day
-      for (final day in repeatDays) {
-        final alarmId = _getAlarmId(workoutId, day);
-        final scheduledTime = _getNextAlarmTime(day, time);
+      final timeOfDay = schedule.timeOfDay;
+      if (timeOfDay == null) {
+        debugPrint('❌ Invalid time format: ${schedule.scheduledTime}');
+        return;
+      }
 
-        debugPrint('📅 Scheduling alarm for ${_getDayName(day)}:');
-        debugPrint('   - alarmId: $alarmId');
-        debugPrint('   - time: ${time.hour}:${time.minute}');
-        debugPrint('   - next occurrence: $scheduledTime');
+      // If repeatDays is empty, schedule for specific date only (one-time)
+      if (schedule.repeatDays.isEmpty) {
+        debugPrint('📅 Scheduling ONE-TIME alarm for ${schedule.scheduledDate}');
+        final alarmId = _getAlarmId(schedule.id, 0);
+        
+        // Create exact datetime for the scheduled date and time
+        final scheduledTime = tz.TZDateTime(
+          tz.local,
+          schedule.scheduledDate.year,
+          schedule.scheduledDate.month,
+          schedule.scheduledDate.day,
+          timeOfDay.hour,
+          timeOfDay.minute,
+        );
 
-        try {
-          await _notifications.zonedSchedule(
-            alarmId,
-            '🔥 Workout Time: $workoutName',
-            '${_getMotivationalQuote()}\n\nTap to start your workout!',
-            scheduledTime,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                _channelId,
-                _channelName,
-                channelDescription: _channelDescription,
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                enableLights: true,
-                fullScreenIntent: true,
-                ongoing: false,
-                autoCancel: true,
-                largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-                styleInformation: const BigTextStyleInformation(
-                  '',
-                  contentTitle: '🔥 Workout Time',
-                  summaryText: 'FitnessOS',
+        // Only schedule if it's in the future
+        if (scheduledTime.isAfter(tz.TZDateTime.now(tz.local))) {
+          try {
+            await _notifications.zonedSchedule(
+              alarmId,
+              '💪 ${schedule.workoutName}',
+              '${_getMotivationalQuote()}\n\nTap to start your workout',
+              scheduledTime,
+              const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  _channelId,
+                  _channelName,
+                  channelDescription: _channelDescription,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                  enableLights: true,
+                  fullScreenIntent: true,
+                  ongoing: false,
+                  autoCancel: true,
+                ),
+                iOS: DarwinNotificationDetails(
+                  presentAlert: true,
+                  presentSound: true,
+                  presentBadge: true,
                 ),
               ),
-              iOS: const DarwinNotificationDetails(
-                presentAlert: true,
-                presentSound: true,
-                presentBadge: true,
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              payload: schedule.id,
+            );
+
+            successCount++;
+            debugPrint('   ✅ SUCCESS - scheduled for $scheduledTime');
+
+            _scheduledAlarms[alarmId] = {
+              'workoutName': schedule.workoutName,
+              'scheduleId': schedule.id,
+              'day': 0,
+              'time': schedule.scheduledTime,
+              'scheduledAt': scheduledTime.toIso8601String(),
+            };
+          } catch (e) {
+            failCount++;
+            debugPrint('   ❌ ERROR: $e');
+          }
+        } else {
+          debugPrint('   ⚠️ Skipped: time is in the past ($scheduledTime)');
+        }
+      } else {
+        // Schedule for each repeat day (weekly recurring)
+        debugPrint('📅 Scheduling RECURRING alarms for days: ${schedule.repeatDays}');
+        for (final day in schedule.repeatDays) {
+          final alarmId = _getAlarmId(schedule.id, day);
+          final scheduledTime = _getNextAlarmTime(day, timeOfDay);
+
+          debugPrint('📅 Scheduling alarm for ${_getDayName(day)}:');
+          debugPrint('   - alarmId: $alarmId');
+          debugPrint('   - time: ${schedule.scheduledTime}');
+          debugPrint('   - next occurrence: $scheduledTime');
+
+          try {
+            await _notifications.zonedSchedule(
+              alarmId,
+              '💪 ${schedule.workoutName}',
+              '${_getMotivationalQuote()}\n\nTap to start your workout',
+              scheduledTime,
+              const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  _channelId,
+                  _channelName,
+                  channelDescription: _channelDescription,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                  enableLights: true,
+                  fullScreenIntent: true,
+                  ongoing: false,
+                  autoCancel: true,
+                ),
+                iOS: DarwinNotificationDetails(
+                  presentAlert: true,
+                  presentSound: true,
+                  presentBadge: true,
+                ),
               ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            payload: workoutId,
-          );
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              payload: schedule.id,
+            );
 
-          successCount++;
-          debugPrint('   ✅ SUCCESS for ${_getDayName(day)}');
+            successCount++;
+            debugPrint('   ✅ SUCCESS for ${_getDayName(day)}');
 
-          // Track this alarm
-          _scheduledAlarms[alarmId] = {
-            'workoutName': workoutName,
-            'workoutId': workoutId,
-            'day': day,
-            'time': '${time.hour}:${time.minute}',
-            'scheduledAt': scheduledTime.toIso8601String(),
-          };
-        } catch (e) {
-          failCount++;
-          debugPrint('   ❌ ERROR for ${_getDayName(day)}: $e');
+            _scheduledAlarms[alarmId] = {
+              'workoutName': schedule.workoutName,
+              'scheduleId': schedule.id,
+              'day': day,
+              'time': schedule.scheduledTime,
+              'scheduledAt': scheduledTime.toIso8601String(),
+            };
+          } catch (e) {
+            failCount++;
+            debugPrint('   ❌ ERROR for ${_getDayName(day)}: $e');
+          }
         }
       }
 
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('📊 Alarm scheduling summary for "$workoutName":');
+      debugPrint('📊 Alarm scheduling summary for "${schedule.workoutName}":');
       debugPrint('   ✅ Success: $successCount');
       debugPrint('   ❌ Failed: $failCount');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     } catch (e, stack) {
-      debugPrint('❌ scheduleWorkoutAlarm error: $e');
+      debugPrint('❌ scheduleAlarm error: $e');
       debugPrint('Stack: $stack');
     }
   }
 
-  /// Schedule ONE-TIME alarm for a specific date and time (not recurring)
-  static Future<void> scheduleOneTimeWorkoutAlarm({
-    required String workoutId,
-    required String workoutName,
-    required DateTime scheduledDate,
-    required TimeOfDay time,
-  }) async {
-    try {
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🔔 scheduleOneTimeWorkoutAlarm called for "$workoutName"');
-      debugPrint('   - date: ${scheduledDate.year}-${scheduledDate.month}-${scheduledDate.day}');
-      debugPrint('   - time: ${time.hour}:${time.minute}');
-      
-      // Check permissions first
-      final hasPerms = await hasPermissions();
-      if (!hasPerms) {
-        debugPrint('❌ FAILED: Missing permissions!');
-        debugPrint('   Requesting permissions now...');
-        final granted = await requestPermissions();
-        if (!granted) {
-          debugPrint('❌ CRITICAL: User denied permissions. Alarm cannot be scheduled.');
-          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          return;
-        }
-      }
-      
-      final alarmId = workoutId.hashCode.abs() % 2147483647;
-      
-      // Create exact datetime for the alarm
-      final scheduledDateTime = tz.TZDateTime(
-        tz.local,
-        scheduledDate.year,
-        scheduledDate.month,
-        scheduledDate.day,
-        time.hour,
-        time.minute,
-      );
-      
-      final now = tz.TZDateTime.now(tz.local);
-      final timeDiff = scheduledDateTime.difference(now);
-      
-      debugPrint('   - scheduledDateTime: $scheduledDateTime');
-      debugPrint('   - currentTime: $now');
-      debugPrint('   - timeDifference: ${timeDiff.inHours}h ${timeDiff.inMinutes % 60}m');
-      debugPrint('   - alarmId: $alarmId');
-      
-      // Only schedule if in the future
-      if (scheduledDateTime.isBefore(now)) {
-        debugPrint('⏰ SKIPPED: Scheduled time is in the past');
-        debugPrint('   (scheduled: $scheduledDateTime, now: $now)');
-        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        return;
-      }
-      
-      await _notifications.zonedSchedule(
-        alarmId,
-        '🔥 Workout Time: $workoutName',
-        '${_getMotivationalQuote()}\n\nTap to start your workout!',
-        scheduledDateTime,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-            enableLights: true,
-            fullScreenIntent: true,
-            ongoing: false,
-            autoCancel: true,
-            largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-            styleInformation: const BigTextStyleInformation(
-              '',
-              contentTitle: '🔥 Workout Time',
-              summaryText: 'FitnessOS',
-            ),
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentSound: true,
-            presentBadge: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: workoutId,
-      );
-      
-      debugPrint('   ✅ SUCCESS: One-time alarm scheduled');
-      debugPrint('   ⏰ Will fire in ${timeDiff.inHours}h ${timeDiff.inMinutes % 60}m');
-      
-      // Verify it was scheduled
-      final pending = await _notifications.pendingNotificationRequests();
-      final found = pending.any((n) => n.id == alarmId);
-      debugPrint('   🔍 Verification: ${found ? "✅ Alarm found in system" : "❌ Alarm NOT found in system!"}');
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
-      // Track this alarm
-      _scheduledAlarms[alarmId] = {
-        'workoutName': workoutName,
-        'workoutId': workoutId,
-        'scheduledDate': scheduledDate.toIso8601String(),
-        'time': '${time.hour}:${time.minute}',
-        'scheduledAt': scheduledDateTime.toIso8601String(),
-      };
-    } catch (e, stack) {
-      debugPrint('❌ scheduleOneTimeWorkoutAlarm error: $e');
-      debugPrint('Stack: $stack');
-      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    }
-  }
-
-  /// Cancel all alarms for a workout
-  static Future<void> cancelWorkoutAlarm(String workoutId) async {
+  /// Cancel all alarms for a schedule
+  static Future<void> cancelAlarm(String scheduleId) async {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('🗑️ CANCELLING ALARMS for workout: $workoutId');
+    debugPrint('🗑️ CANCELLING ALARMS for schedule: $scheduleId');
     
     // Get pending notifications BEFORE cancellation
     final pendingBefore = await _notifications.pendingNotificationRequests();
-    final workoutAlarmIds = <int>[];
+    final scheduleAlarmIds = <int>[];
     
     for (int day = 0; day < 7; day++) {
-      final id = _getAlarmId(workoutId, day);
-      workoutAlarmIds.add(id);
+      final id = _getAlarmId(scheduleId, day);
+      scheduleAlarmIds.add(id);
     }
     
-    final relevantBefore = pendingBefore.where((n) => workoutAlarmIds.contains(n.id)).toList();
-    debugPrint('📊 Found ${relevantBefore.length} pending alarms for this workout');
+    final relevantBefore = pendingBefore.where((n) => scheduleAlarmIds.contains(n.id)).toList();
+    debugPrint('📊 Found ${relevantBefore.length} pending alarms for this schedule');
     
     // Cancel each alarm with error handling
     int successCount = 0;
     int failCount = 0;
     
     for (int day = 0; day < 7; day++) {
-      final id = _getAlarmId(workoutId, day);
+      final id = _getAlarmId(scheduleId, day);
       try {
         await _notifications.cancel(id);
         _scheduledAlarms.remove(id);
@@ -335,10 +291,10 @@ class WorkoutAlarmService {
     
     // Verify cancellation at OS level
     final pendingAfter = await _notifications.pendingNotificationRequests();
-    final relevantAfter = pendingAfter.where((n) => workoutAlarmIds.contains(n.id)).toList();
+    final relevantAfter = pendingAfter.where((n) => scheduleAlarmIds.contains(n.id)).toList();
     
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('📊 Cancellation Summary for workout: $workoutId');
+    debugPrint('📊 Cancellation Summary for schedule: $scheduleId');
     debugPrint('   ✅ Successfully cancelled: $successCount');
     debugPrint('   ❌ Failed to cancel: $failCount');
     debugPrint('   📋 Pending BEFORE: ${relevantBefore.length}');
@@ -376,8 +332,8 @@ class WorkoutAlarmService {
   }
 
   /// Generate unique alarm ID
-  static int _getAlarmId(String workoutId, int day) {
-    return ((workoutId.hashCode.abs() % 900000) + 100000) * 10 + day;
+  static int _getAlarmId(String scheduleId, int day) {
+    return ((scheduleId.hashCode.abs() % 900000) + 100000) * 10 + day;
   }
 
   /// Get day name for logging
@@ -394,19 +350,17 @@ class WorkoutAlarmService {
     return days[day];
   }
 
-  /// Get fitness-focused motivational quote
+  /// Get motivational quote
   static String _getMotivationalQuote() {
     const quotes = [
-      "Time to destroy your workout!",
-      "Your body is capable of amazing things.",
-      "Champions train when others rest.",
-      "Every rep counts. Let's go!",
-      "Consistency builds legends.",
-      "The only bad workout is the one that didn't happen.",
-      "Push yourself. Nobody else will do it for you.",
+      "Your future self is counting on you.",
+      "Discipline beats motivation.",
+      "Consistency builds strength.",
+      "Every rep brings you closer.",
       "Transform your body, transform your life.",
-      "No excuses. Just results.",
-      "Beast mode: ACTIVATED.",
+      "Future You is watching — train now.",
+      "Make yourself proud today.",
+      "One workout closer to your goals.",
     ];
     final index = DateTime.now().minute % quotes.length;
     return quotes[index];
@@ -419,7 +373,7 @@ class WorkoutAlarmService {
       const testId = 999999;
 
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      debugPrint('🧪 SCHEDULING TEST WORKOUT ALARM');
+      debugPrint('🧪 SCHEDULING TEST ALARM');
       debugPrint('   - Current time: ${tz.TZDateTime.now(tz.local)}');
       debugPrint('   - Test alarm time: $testTime');
       debugPrint('   - Alarm ID: $testId');
@@ -427,8 +381,8 @@ class WorkoutAlarmService {
 
       await _notifications.zonedSchedule(
         testId,
-        '🧪 TEST WORKOUT ALARM',
-        'This is a 1-minute test alarm. If you see this, workout alarms work!',
+        '🧪 TEST ALARM',
+        'This is a 1-minute test alarm. If you see this, alarms work!',
         testTime,
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -456,7 +410,7 @@ class WorkoutAlarmService {
 
       _scheduledAlarms[testId] = {
         'workoutName': '🧪 TEST ALARM',
-        'workoutId': 'test',
+        'scheduleId': 'test',
         'day': 0,
         'time': '${testTime.hour.toString().padLeft(2, '0')}:${testTime.minute.toString().padLeft(2, '0')}',
         'scheduledAt': testTime.toIso8601String(),
@@ -472,82 +426,18 @@ class WorkoutAlarmService {
     return _initialized;
   }
 
-  /// Check if all required permissions are granted
-  static Future<bool> hasPermissions() async {
-    try {
-      final notifStatus = await Permission.notification.status;
-      final alarmStatus = await Permission.scheduleExactAlarm.status;
-      
-      final hasPerms = notifStatus.isGranted && alarmStatus.isGranted;
-      
-      debugPrint('🔐 Permission Check:');
-      debugPrint('   - Notification: ${notifStatus.isGranted ? "✅" : "❌"} ($notifStatus)');
-      debugPrint('   - Exact Alarm: ${alarmStatus.isGranted ? "✅" : "❌"} ($alarmStatus)');
-      debugPrint('   - Overall: ${hasPerms ? "✅ GRANTED" : "❌ MISSING"}');
-      
-      return hasPerms;
-    } catch (e) {
-      debugPrint('❌ Permission check error: $e');
-      return false;
-    }
+  /// Get pending notifications for debugging
+  static Future<List<PendingNotificationRequest>> getPendingAlarms() async {
+    return await _notifications.pendingNotificationRequests();
   }
 
-  /// Request permissions if not granted
-  static Future<bool> requestPermissions() async {
-    try {
-      debugPrint('🔐 Requesting alarm permissions...');
-      
-      final notifStatus = await Permission.notification.request();
-      final alarmStatus = await Permission.scheduleExactAlarm.request();
-      
-      final granted = notifStatus.isGranted && alarmStatus.isGranted;
-      
-      if (granted) {
-        debugPrint('✅ All permissions granted!');
-      } else {
-        debugPrint('❌ Permissions denied:');
-        if (!notifStatus.isGranted) {
-          debugPrint('   - Notification permission: $notifStatus');
-        }
-        if (!alarmStatus.isGranted) {
-          debugPrint('   - Exact alarm permission: $alarmStatus');
-        }
-      }
-      
-      return granted;
-    } catch (e) {
-      debugPrint('❌ Permission request error: $e');
-      return false;
-    }
-  }
-
-  /// Get all pending alarms from the system
-  static Future<List<Map<String, dynamic>>> getPendingAlarms() async {
-    try {
-      final pending = await _notifications.pendingNotificationRequests();
-      debugPrint('📋 Found ${pending.length} pending notifications in system');
-      
-      return pending.map((notif) {
-        return {
-          'id': notif.id,
-          'title': notif.title ?? 'Unknown',
-          'body': notif.body ?? '',
-          'payload': notif.payload ?? '',
-        };
-      }).toList();
-    } catch (e) {
-      debugPrint('❌ Error getting pending alarms: $e');
-      return [];
-    }
-  }
-
-  /// Get scheduled alarms for debugging
+  /// Expose scheduled alarms for debugging
   static List<Map<String, dynamic>> getScheduledAlarms() {
     return _scheduledAlarms.entries.map((entry) {
       return {
         'id': entry.key,
         'workoutName': entry.value['workoutName'] ?? 'Unknown',
-        'workoutId': entry.value['workoutId'] ?? 'Unknown',
+        'scheduleId': entry.value['scheduleId'] ?? 'Unknown',
         'day': entry.value['day'] ?? 0,
       };
     }).toList();

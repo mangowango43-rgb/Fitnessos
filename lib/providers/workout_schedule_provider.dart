@@ -9,7 +9,7 @@ final workoutSchedulesProvider = StateNotifierProvider<WorkoutSchedulesNotifier,
   return WorkoutSchedulesNotifier();
 });
 
-/// Notifier for managing workout schedules with Hive
+/// Notifier for managing workout schedules with Hive (like FutureYou's HabitEngine)
 class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
   WorkoutSchedulesNotifier() : super([]) {
     loadSchedules();
@@ -38,42 +38,20 @@ class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
       await _schedulesBox.put(schedule.id, schedule);
       debugPrint('   ✅ Schedule saved to Hive');
       
-      // Schedule alarm if enabled (like FutureYou)
+      // Schedule alarm if enabled (using FutureYou's exact logic)
       if (schedule.hasAlarm && schedule.scheduledTime != null && schedule.scheduledTime!.isNotEmpty) {
-        debugPrint('   🔔 Attempting to schedule alarm...');
+        debugPrint('   🔔 Attempting to schedule alarm using FutureYou logic...');
         
-        final time = schedule.timeOfDay;
-        if (time != null) {
-          try {
-            // Cancel existing alarms first
-            await WorkoutAlarmService.cancelWorkoutAlarm(schedule.id);
-            
-            // If repeat days are set, use recurring alarm logic
-            if (schedule.repeatDays.isNotEmpty) {
-              debugPrint('   📅 Scheduling RECURRING alarm for days: ${schedule.repeatDays}');
-              await WorkoutAlarmService.scheduleWorkoutAlarm(
-                workoutId: schedule.id,
-                workoutName: schedule.workoutName,
-                time: time,
-                repeatDays: schedule.repeatDays,
-              );
-            } else {
-              // One-time alarm for specific date
-              debugPrint('   📅 Scheduling ONE-TIME alarm for: ${schedule.scheduledDate}');
-              await WorkoutAlarmService.scheduleOneTimeWorkoutAlarm(
-                workoutId: schedule.id,
-                workoutName: schedule.workoutName,
-                scheduledDate: schedule.scheduledDate,
-                time: time,
-              );
-            }
-            
-            debugPrint('   ✅ Alarm scheduling completed');
-          } catch (e) {
-            debugPrint('   ❌ Failed to schedule alarm: $e');
-          }
-        } else {
-          debugPrint('   ❌ Invalid time format: ${schedule.scheduledTime}');
+        try {
+          // Cancel existing alarms first
+          await WorkoutAlarmService.cancelAlarm(schedule.id);
+          
+          // Schedule new alarm
+          await WorkoutAlarmService.scheduleAlarm(schedule);
+          
+          debugPrint('   ✅ Alarm scheduling completed');
+        } catch (e) {
+          debugPrint('   ❌ Failed to schedule alarm: $e');
         }
       }
       
@@ -87,21 +65,42 @@ class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
     }
   }
 
-  /// Delete a schedule
+  /// Delete a schedule (like FutureYou's deleteHabit)
   Future<void> deleteSchedule(String scheduleId) async {
-    debugPrint('🗑️ Deleting schedule: $scheduleId');
-    await _schedulesBox.delete(scheduleId);
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('🗑️ DELETING SCHEDULE: $scheduleId');
     
-    // Cancel alarm
-    try {
-      await WorkoutAlarmService.cancelWorkoutAlarm(scheduleId);
-      debugPrint('✅ Alarm cancelled');
-    } catch (e) {
-      debugPrint('⚠️ Failed to cancel alarm: $e');
+    // Find schedule details for logging
+    final schedule = _schedulesBox.get(scheduleId);
+    if (schedule != null) {
+      debugPrint('   📝 Workout: "${schedule.workoutName}"');
+      debugPrint('   ⏰ Had alarm: ${schedule.hasAlarm}');
+      debugPrint('   🕐 Time: ${schedule.scheduledTime ?? "N/A"}');
     }
     
+    // Step 1: Cancel alarms FIRST (before deleting from storage)
+    try {
+      debugPrint('🔔 Step 1: Cancelling alarms...');
+      await WorkoutAlarmService.cancelAlarm(scheduleId);
+      debugPrint('✅ Alarm cancellation completed');
+    } catch (e, stack) {
+      debugPrint('❌ CRITICAL ERROR: Failed to cancel alarms for schedule: $scheduleId');
+      debugPrint('Error: $e');
+      debugPrint('Stack: $stack');
+      debugPrint('⚠️ Continuing with schedule deletion despite alarm cancellation failure');
+    }
+    
+    // Step 2: Delete from storage
+    debugPrint('💾 Step 2: Deleting from Hive...');
+    await _schedulesBox.delete(scheduleId);
+    
+    // Step 3: Reload state
+    debugPrint('🔄 Step 3: Reloading schedules...');
     await loadSchedules();
-    debugPrint('✅ Schedule deleted');
+    
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('✅ DELETION COMPLETE for: "${schedule?.workoutName ?? scheduleId}"');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   /// Mark schedule as completed
@@ -144,4 +143,3 @@ final todaysHeroWorkoutProvider = Provider<WorkoutSchedule?>((ref) {
 
   return todaySchedules.isNotEmpty ? todaySchedules.first : null;
 });
-
