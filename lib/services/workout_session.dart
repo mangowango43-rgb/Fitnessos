@@ -101,7 +101,7 @@ class WorkoutSession {
     _repHistory = [];
     _setStartTime = DateTime.now();
 
-    await _voice.announceExercise(exerciseId, sets, reps);
+    _voice.announceExercise(exerciseId, sets, reps);
   }
   
   /// Process pose landmarks from camera

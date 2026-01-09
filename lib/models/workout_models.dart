@@ -131,6 +131,10 @@ class WorkoutPreset {
     return totalCalories;
   }
 
+  int get totalSets {
+    return exercises.where((e) => e.included).fold(0, (sum, exercise) => sum + exercise.sets);
+  }
+
   int _getCaloriesPerSet(String exerciseName) {
     final name = exerciseName.toLowerCase();
     

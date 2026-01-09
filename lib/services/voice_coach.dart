@@ -1,7 +1,6 @@
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:async';
 import 'dart:collection';
-import 'exercise_rules.dart';
 
 enum SpeechPriority { critical, repCount, setStatus, formAlert, coaching }
 
@@ -16,7 +15,7 @@ class _SpeechItem {
   _SpeechItem({required this.message, required this.priority, DateTime? createdAt, this.maxAge})
       : createdAt = createdAt ?? DateTime.now();
 
-  bool get isExpired => maxAge != null && DateTime.now().difference(createdAt) > maxAge;
+  bool get isExpired => maxAge != null && DateTime.now().difference(createdAt) > (maxAge ?? Duration.zero);
 }
 
 class VoiceCoach {
@@ -26,7 +25,7 @@ class VoiceCoach {
   bool _isSpeaking = false;
   bool _isEnabled = true;
   
-  ExerciseRule? _currentExercise;
+  String? _currentExerciseId;
   MuscleGroup _currentMuscleGroup = MuscleGroup.fullBody;
   
   final Queue<_SpeechItem> _speechQueue = Queue();
@@ -83,13 +82,13 @@ class VoiceCoach {
   }
   
   // CONTEXT LOCK
-  void lockToExercise(ExerciseRule exercise) {
-    _currentExercise = exercise;
-    _currentMuscleGroup = _getMuscleGroup(exercise.id);
+  void lockToExercise(String exerciseId) {
+    _currentExerciseId = exerciseId;
+    _currentMuscleGroup = _getMuscleGroup(exerciseId);
   }
   
   void unlock() {
-    _currentExercise = null;
+    _currentExerciseId = null;
     _currentMuscleGroup = MuscleGroup.fullBody;
   }
   
@@ -203,8 +202,7 @@ class VoiceCoach {
   void announceWorkoutComplete() => _queueSpeech('Workout complete!', SpeechPriority.setStatus);
   
   void giveFormWarning(String warning) {
-    final cue = _currentExercise?.cueBad ?? warning;
-    _queueSpeech(cue, SpeechPriority.formAlert, maxAge: Duration(seconds: 2));
+    _queueSpeech(warning, SpeechPriority.formAlert, maxAge: Duration(seconds: 2));
   }
   
   void giveDepthWarning() => _queueSpeech('Depth!', SpeechPriority.formAlert, maxAge: Duration(seconds: 2));
@@ -228,8 +226,8 @@ class VoiceCoach {
   }
   
   void onHitBottom() {
-    if (_currentExercise == null) return;
-    final id = _currentExercise!.id.toLowerCase();
+    if (_currentExerciseId == null) return;
+    final id = _currentExerciseId!.toLowerCase();
     
     if (id.contains('squat') || id.contains('lunge')) {
       _queueSpeech('Drive!', SpeechPriority.formAlert, maxAge: Duration(seconds: 1));
