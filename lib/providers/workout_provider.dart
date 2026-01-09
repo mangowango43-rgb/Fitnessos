@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/workout_models.dart';
+import '../models/workout_schedule.dart';
 import '../services/storage_service.dart';
 import '../services/workout_alarm_service.dart';
 
@@ -57,14 +58,20 @@ class CommittedWorkoutNotifier extends StateNotifier<LockedWorkout?> {
     final storage = await StorageService.getInstance();
     await storage.scheduleWorkout(date, workout, alarmTime, repeatDays);
     
-    // Schedule alarm if time is set
-    if (alarmTime != null && repeatDays.isNotEmpty) {
-      await WorkoutAlarmService.scheduleWorkoutAlarm(
+    // Schedule alarm if time is set (using new WorkoutSchedule-based system)
+    if (alarmTime != null) {
+      final schedule = WorkoutSchedule(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
         workoutId: workout.id,
         workoutName: workout.name,
-        time: alarmTime,
+        scheduledDate: date,
+        scheduledTime: '${alarmTime.hour.toString().padLeft(2, '0')}:${alarmTime.minute.toString().padLeft(2, '0')}',
+        hasAlarm: true,
+        createdAt: DateTime.now(),
         repeatDays: repeatDays,
       );
+      
+      await WorkoutAlarmService.scheduleAlarm(schedule);
     }
   }
 
@@ -80,8 +87,8 @@ class CommittedWorkoutNotifier extends StateNotifier<LockedWorkout?> {
     final workout = storage.getScheduledWorkout(date);
     
     if (workout != null) {
-      // Cancel alarm
-      await WorkoutAlarmService.cancelWorkoutAlarm(workout.id);
+      // Cancel alarm using schedule ID (workout ID in this case)
+      await WorkoutAlarmService.cancelAlarm(workout.id);
     }
     
     await storage.cancelScheduledWorkout(date);
