@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../logic/habit_engine.dart';
-import '../services/local_storage.dart';
+import 'habit_engine.dart';
+import 'local_storage.dart';
 
 final habitEngineProvider = ChangeNotifierProvider<HabitEngine>((ref) {
   final engine = HabitEngine(LocalStorageService());

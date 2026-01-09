@@ -8,6 +8,7 @@ import '../../providers/workout_provider.dart';
 import '../../providers/workout_schedule_provider.dart';
 import '../../models/workout_schedule.dart';
 import '../../models/workout_models.dart';
+import '../../models/workout_data.dart';
 import '../../services/storage_service.dart';
 import '../../services/workout_alarm_service.dart';
 import '../../widgets/animated_counter.dart';
@@ -397,17 +398,23 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     bool hasAlarm = false;
     
     if (displayWorkout is WorkoutSchedule) {
-      // For scheduled workouts, we only have name and time
-      // We need to fetch the actual workout data from WorkoutData
+      // For scheduled workouts, fetch the actual workout data
       workoutName = displayWorkout.workoutName;
       scheduledTime = displayWorkout.scheduledTime;
       hasAlarm = displayWorkout.hasAlarm;
       
-      // TODO: Fetch actual workout from WorkoutData using workoutId
-      // For now, use placeholder values
-      exerciseCount = 0;
-      totalSets = 0;
-      estimatedCalories = 0;
+      // Fetch actual workout from WorkoutData using workoutId
+      final WorkoutPreset? workoutPreset = _findWorkoutById(displayWorkout.workoutId);
+      if (workoutPreset != null) {
+        exerciseCount = workoutPreset.exercises.where((e) => e.included).length;
+        totalSets = workoutPreset.totalSets;
+        estimatedCalories = workoutPreset.estimatedCalories;
+      } else {
+        // Fallback if workout not found
+        exerciseCount = 0;
+        totalSets = 0;
+        estimatedCalories = 0;
+      }
     } else {
       // For LockedWorkout
       workoutName = displayWorkout.name;
@@ -1287,27 +1294,30 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       // Save schedule to Hive
       await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
       
-      // ALWAYS commit to global provider when editing workout
-      final preset = WorkoutPreset(
-        id: selected['id'] as String,
-        name: selected['name'] as String,
-        category: 'gym',
-        subcategory: selected['type'] as String? ?? 'gym',
-        exercises: [], // Will be populated from workout data
-        isCircuit: false,
-        duration: selected['duration'] as String?,
-      );
+      // Only commit to global provider if scheduling for TODAY
+      final now = DateTime.now();
+      final isSchedulingForToday = _selectedDate.year == now.year &&
+                                  _selectedDate.month == now.month &&
+                                  _selectedDate.day == now.day;
       
-      await ref
-          .read(committedWorkoutProvider.notifier)
-          .commitWorkout(preset);
+      if (isSchedulingForToday) {
+        final preset = WorkoutPreset(
+          id: selected['id'] as String,
+          name: selected['name'] as String,
+          category: 'gym',
+          subcategory: selected['type'] as String? ?? 'gym',
+          exercises: [], // Will be populated from workout data
+          isCircuit: false,
+          duration: selected['duration'] as String?,
+        );
+        
+        await ref
+            .read(committedWorkoutProvider.notifier)
+            .commitWorkout(preset);
+      }
       
       if (mounted) {
-        final now = DateTime.now();
-        final isToday = _selectedDate.year == now.year &&
-                        _selectedDate.month == now.month &&
-                        _selectedDate.day == now.day;
-        final dateStr = isToday 
+        final dateStr = isSchedulingForToday 
             ? 'today'
             : '${_selectedDate.month}/${_selectedDate.day}';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1663,6 +1673,18 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     {'days': 1000, 'emoji': '🌠', 'title': 'Immortal', 'color': Color(0xFFB7FF00)},
     {'days': 1500, 'emoji': '⭐', 'title': 'Transcendent', 'color': Color(0xFFFFD60A)},
   ];
+
+  /// Helper method to find workout preset by ID
+  WorkoutPreset? _findWorkoutById(String workoutId) {
+    try {
+      return WorkoutData.allWorkoutPresets.firstWhere(
+        (preset) => preset.id == workoutId,
+      );
+    } catch (e) {
+      // Also check custom workouts
+      return null; // We'll handle custom workouts later if needed
+    }
+  }
 }
 
 

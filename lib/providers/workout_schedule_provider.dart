@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/workout_schedule.dart';
 import '../services/workout_alarm_service.dart';
+import '../futureyou.logic.alarm.sceduling/alarm_service.dart' as FutureYouAlarm;
+import '../futureyou.logic.alarm.sceduling/habit.dart';
 
 /// Provider for workout schedules - using Hive like FutureYou
 final workoutSchedulesProvider = StateNotifierProvider<WorkoutSchedulesNotifier, List<WorkoutSchedule>>((ref) {
@@ -42,30 +44,27 @@ class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
       if (schedule.hasAlarm && schedule.scheduledTime != null && schedule.scheduledTime!.isNotEmpty) {
         debugPrint('   🔔 Attempting to schedule alarm...');
         
-        // Check if alarm service is initialized
-        if (!WorkoutAlarmService.isInitialized()) {
-          debugPrint('   ❌ Alarm service not initialized!');
-          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          await loadSchedules();
-          return;
-        }
-        
-        // Check permissions
-        final hasPerms = await WorkoutAlarmService.hasPermissions();
-        if (!hasPerms) {
-          debugPrint('   ⚠️ Missing alarm permissions, requesting...');
-          final granted = await WorkoutAlarmService.requestPermissions();
-          if (!granted) {
-            debugPrint('   ❌ User denied permissions. Alarm not scheduled.');
-            debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            await loadSchedules();
-            return;
-          }
-        }
+        // Use FutureYou's alarm service instead
+        debugPrint('   🔔 Using FutureYou alarm service for workout scheduling...');
         
         final time = schedule.timeOfDay;
         if (time != null) {
           try {
+            // Create a temporary habit for the workout schedule
+            final workoutHabit = Habit(
+              id: 'workout_${schedule.id}',
+              title: schedule.workoutName,
+              type: 'workout',
+              time: schedule.scheduledTime!,
+              startDate: schedule.scheduledDate,
+              endDate: schedule.scheduledDate,
+              repeatDays: schedule.repeatDays.isEmpty ? [schedule.scheduledDate.weekday == 7 ? 0 : schedule.scheduledDate.weekday] : schedule.repeatDays,
+              createdAt: schedule.createdAt,
+              reminderOn: true,
+            );
+            
+            await FutureYouAlarm.AlarmService.scheduleAlarm(workoutHabit);
+            debugPrint('   ✅ FutureYou alarm scheduled for workout: ${schedule.workoutName}');
             // Cancel existing alarms first
             await WorkoutAlarmService.cancelWorkoutAlarm(schedule.id);
             
@@ -112,7 +111,22 @@ class WorkoutSchedulesNotifier extends StateNotifier<List<WorkoutSchedule>> {
   Future<void> deleteSchedule(String scheduleId) async {
     debugPrint('🗑️ Deleting schedule: $scheduleId');
     await _schedulesBox.delete(scheduleId);
-    await WorkoutAlarmService.cancelWorkoutAlarm(scheduleId);
+    
+    // Cancel both FutureYou and original alarms
+    try {
+      await FutureYouAlarm.AlarmService.cancelAlarm('workout_$scheduleId');
+      debugPrint('✅ FutureYou alarm cancelled');
+    } catch (e) {
+      debugPrint('⚠️ Failed to cancel FutureYou alarm: $e');
+    }
+    
+    try {
+      await WorkoutAlarmService.cancelWorkoutAlarm(scheduleId);
+      debugPrint('✅ Original alarm cancelled');
+    } catch (e) {
+      debugPrint('⚠️ Failed to cancel original alarm: $e');
+    }
+    
     await loadSchedules();
     debugPrint('✅ Schedule deleted');
   }

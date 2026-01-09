@@ -1,6 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/habit.dart';
-import '../models/habit_system.dart';
+import 'habit.dart';
+import 'habit_system.dart';
 
 class LocalStorageService {
   static const String _habitsBoxName = 'habits';

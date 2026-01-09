@@ -1,11 +1,34 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../models/habit.dart';
-import '../services/local_storage.dart';
-import '../services/sync_service.dart';
-import '../services/api_client.dart';
-import '../services/alarm_service.dart';
+import 'habit.dart';
+import 'local_storage.dart';
+import 'alarm_service.dart';
+
+// Mock services for now - you can implement these later if needed
+class SyncService {
+  void queueCompletion(HabitCompletion completion) {}
+}
+
+class HabitCompletion {
+  final String habitId;
+  final String habitTitle;
+  final DateTime date;
+  final bool done;
+  final int streak;
+  final DateTime? completedAt;
+  
+  HabitCompletion({
+    required this.habitId,
+    required this.habitTitle,
+    required this.date,
+    required this.done,
+    required this.streak,
+    this.completedAt,
+  });
+}
+
+final syncService = SyncService();
 
 class HabitEngine extends ChangeNotifier {
   final LocalStorageService localStorageService;

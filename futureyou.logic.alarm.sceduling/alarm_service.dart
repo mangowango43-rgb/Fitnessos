@@ -3,7 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 
-import '../models/habit.dart';
+import 'habit.dart';
 
 class AlarmService {
   static final FlutterLocalNotificationsPlugin _notifications =
