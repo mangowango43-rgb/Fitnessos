@@ -157,13 +157,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                               const SizedBox(height: 20),
 
                               // ═══════════════════════════════════════════════
-                              // QUICK ACTIONS: Browse Workouts + Create Custom
-                              // ═══════════════════════════════════════════════
-                              _buildQuickActionsRow(context),
-
-                              const SizedBox(height: 77), // Pushed down by 1.5cm (~57px) from original 20
-
-                              // ═══════════════════════════════════════════════
                               // RECOVERY STATUS: Muscle group readiness
                               // ═══════════════════════════════════════════════
                               _buildRecoveryStatusCard(stats),
@@ -520,7 +513,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                             const Text('🔥', style: TextStyle(fontSize: 14)),
                             const SizedBox(width: 4),
                             Text(
-                              '3', // TODO: Get workout-specific streak
+                              '0', // TODO: Get workout-specific streak
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.95),
                                 fontSize: 14,
@@ -1100,9 +1093,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                label: 'STREAK',
-                value: '${stats.currentStreak}',
-                subtitle: 'days',
+                label: 'CALORIES',
+                value: '${(stats.repsThisWeek * 5).round()}',
+                subtitle: 'burned',
                 icon: Icons.local_fire_department,
                 gradient: const LinearGradient(
                   colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
@@ -1288,14 +1281,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // RECOVERY STATUS CARD
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildRecoveryStatusCard(WorkoutStats stats) {
-    final recoveryData = [
-      {'muscle': '💪 CHEST', 'percent': 0.9, 'status': 'READY', 'color': AppColors.cyberLime},
-      {'muscle': '🦵 LEGS', 'percent': 0.45, 'status': '36H LEFT', 'color': AppColors.neonCrimson},
-      {'muscle': '🔙 BACK', 'percent': 1.0, 'status': 'OPTIMAL', 'color': AppColors.cyberLime},
-      {'muscle': '💪 SHOULDERS', 'percent': 0.8, 'status': 'READY', 'color': AppColors.cyberLime},
-      {'muscle': '💪 ARMS', 'percent': 0.75, 'status': 'READY', 'color': AppColors.electricCyan},
-    ];
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1328,47 +1313,36 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          ...recoveryData.map((data) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+          const SizedBox(height: 24),
+          Center(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      data['muscle'] as String,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      data['status'] as String,
-                      style: TextStyle(
-                        color: data['color'] as Color,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
+                Icon(
+                  Icons.fitness_center_outlined,
+                  color: AppColors.white30,
+                  size: 48,
                 ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: data['percent'] as double,
-                    minHeight: 8,
-                    backgroundColor: AppColors.white10,
-                    valueColor: AlwaysStoppedAnimation(data['color'] as Color),
+                const SizedBox(height: 12),
+                Text(
+                  'No Data Yet',
+                  style: TextStyle(
+                    color: AppColors.white40,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Complete workouts to track recovery',
+                  style: TextStyle(
+                    color: AppColors.white30,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
-          )).toList(),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -1605,11 +1579,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        '🔥',
-                        style: TextStyle(fontSize: 32),
+                      const Padding(
+                        padding: EdgeInsets.only(left: 16),
+                        child: Text(
+                          '🔥',
+                          style: TextStyle(fontSize: 32),
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
                           colors: [Color(0xFFFF6B35), Color(0xFFFFD60A)],

@@ -959,6 +959,9 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
     String suffix = '',
     int multiplier = 1,
   }) {
+    final displayValue = value * multiplier;
+    final controller = TextEditingController(text: displayValue.toString());
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -971,63 +974,51 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () {
-                if (value > 1) {
-                  onChanged(value - 1);
+        Container(
+          width: 60,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.cyberLime.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.cyberLime, width: 1),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.cyberLime,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              suffix: Text(
+                suffix,
+                style: const TextStyle(
+                  color: AppColors.cyberLime,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            onChanged: (text) {
+              final parsed = int.tryParse(text);
+              if (parsed != null && parsed > 0) {
+                final actualValue = parsed ~/ multiplier;
+                if (actualValue != value) {
+                  onChanged(actualValue);
                   HapticFeedback.selectionClick();
                 }
-              },
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: AppColors.white10,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.remove, color: Colors.white, size: 16),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 40,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.cyberLime.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.cyberLime, width: 1),
-              ),
-              child: Center(
-                child: Text(
-                  '${value * multiplier}$suffix',
-                  style: const TextStyle(
-                    color: AppColors.cyberLime,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {
-                onChanged(value + 1);
-                HapticFeedback.selectionClick();
-              },
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: AppColors.white10,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.add, color: Colors.white, size: 16),
-              ),
-            ),
-          ],
+              }
+            },
+            onSubmitted: (text) {
+              final parsed = int.tryParse(text) ?? (value * multiplier);
+              final clamped = parsed < 1 ? 1 : parsed;
+              controller.text = clamped.toString();
+              onChanged(clamped ~/ multiplier);
+            },
+          ),
         ),
       ],
     );
