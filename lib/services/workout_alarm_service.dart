@@ -319,8 +319,8 @@ class WorkoutAlarmService {
 
       await _notifications.zonedSchedule(
         testId,
-        '🧪 TEST ALARM',
-        'This is a 1-minute test alarm. If you see this, alarms work!',
+        '💪 TIME TO DOMINATE',
+        'Your body is a weapon. Time to train it. Get up and crush this workout NOW.',
         testTime,
         const NotificationDetails(
           android: AndroidNotificationDetails(
