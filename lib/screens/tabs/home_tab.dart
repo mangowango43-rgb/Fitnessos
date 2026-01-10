@@ -1281,6 +1281,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // RECOVERY STATUS CARD
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildRecoveryStatusCard(WorkoutStats stats) {
+    final recoveryData = [
+      {'muscle': '💪 CHEST', 'percent': 0.0, 'status': 'READY', 'color': AppColors.white30},
+      {'muscle': '🦵 LEGS', 'percent': 0.0, 'status': 'READY', 'color': AppColors.white30},
+      {'muscle': '🔙 BACK', 'percent': 0.0, 'status': 'READY', 'color': AppColors.white30},
+      {'muscle': '💪 SHOULDERS', 'percent': 0.0, 'status': 'READY', 'color': AppColors.white30},
+      {'muscle': '💪 ARMS', 'percent': 0.0, 'status': 'READY', 'color': AppColors.white30},
+    ];
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1313,36 +1321,47 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          Center(
+          const SizedBox(height: 16),
+          ...recoveryData.map((data) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.fitness_center_outlined,
-                  color: AppColors.white30,
-                  size: 48,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      data['muscle'] as String,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      data['status'] as String,
+                      style: TextStyle(
+                        color: data['color'] as Color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'No Data Yet',
-                  style: TextStyle(
-                    color: AppColors.white40,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Complete workouts to track recovery',
-                  style: TextStyle(
-                    color: AppColors.white30,
-                    fontSize: 12,
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: data['percent'] as double,
+                    minHeight: 8,
+                    backgroundColor: AppColors.white10,
+                    valueColor: AlwaysStoppedAnimation(data['color'] as Color),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
+          )).toList(),
         ],
       ),
     );
@@ -1576,32 +1595,32 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(left: 16),
-                        child: Text(
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        const Text(
                           '🔥',
                           style: TextStyle(fontSize: 32),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0xFFFF6B35), Color(0xFFFFD60A)],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'STREAK ACHIEVEMENTS',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 1,
+                        const SizedBox(width: 8),
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [Color(0xFFFF6B35), Color(0xFFFFD60A)],
+                          ).createShader(bounds),
+                          child: const Text(
+                            'STREAK ACHIEVEMENTS',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 1,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
