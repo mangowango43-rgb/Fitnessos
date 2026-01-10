@@ -706,8 +706,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       GestureDetector(
                         onTap: () async {
                           HapticFeedback.mediumImpact();
-                          // If there's already a workout on this date, allow setting alarm for it
-                          // Otherwise, let them schedule a new workout
+                          
                           if (displayWorkout != null) {
                             // Show schedule modal to set time
                             final result = await showModalBottomSheet<Map<String, dynamic>>(
@@ -723,21 +722,61 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                               final timeData = result['time'] as TimeOfDay?;
                               
                               if (timeData != null) {
-                                // Update the existing schedule with alarm info
+                                // Get existing schedule or create new one
+                                WorkoutSchedule? existingSchedule;
+                                String workoutName;
+                                String workoutId;
+                                
                                 if (displayWorkout is WorkoutSchedule) {
-                                  final updatedSchedule = (displayWorkout as WorkoutSchedule).copyWith(
-                                    hasAlarm: true,
-                                    scheduledTime: '${timeData.hour.toString().padLeft(2, '0')}:${timeData.minute.toString().padLeft(2, '0')}',
-                                  );
-                                  await ref.read(workoutSchedulesProvider.notifier).saveSchedule(updatedSchedule);
+                                  existingSchedule = displayWorkout;
+                                  workoutName = displayWorkout.workoutName;
+                                  workoutId = displayWorkout.workoutId;
+                                } else if (displayWorkout is LockedWorkout) {
+                                  workoutName = displayWorkout.name;
+                                  workoutId = displayWorkout.id;
+                                } else {
+                                  return;
                                 }
                                 
+                                // Create updated schedule with alarm
+                                final schedule = WorkoutSchedule(
+                                  id: existingSchedule?.id ?? '${DateTime.now().millisecondsSinceEpoch}',
+                                  workoutId: workoutId,
+                                  workoutName: workoutName,
+                                  scheduledDate: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+                                  scheduledTime: '${timeData.hour.toString().padLeft(2, '0')}:${timeData.minute.toString().padLeft(2, '0')}',
+                                  hasAlarm: true,
+                                  createdAt: existingSchedule?.createdAt ?? DateTime.now(),
+                                  repeatDays: [],
+                                );
+                                
+                                // Save schedule
+                                await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
+                                
+                                // ═══════════════════════════════════════════════════════════════════
+                                // 🔔 FIX 2: ACTUALLY SCHEDULE THE ALARM!
+                                // ═══════════════════════════════════════════════════════════════════
+                                await WorkoutAlarmService.scheduleAlarm(schedule);
+                                debugPrint('🔔 Alarm scheduled for ${schedule.workoutName} at ${schedule.scheduledTime}');
+                                // ═══════════════════════════════════════════════════════════════════
+                                
                                 if (mounted) {
+                                  final dateStr = DateFormat('MMM d').format(_selectedDate);
+                                  final timeStr = timeData.format(context);
+                                  
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Alarm set for ${timeData.format(context)}! ⏰'),
+                                      content: Text(
+                                        '⏰ Alarm set for $dateStr at $timeStr',
+                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                      ),
                                       backgroundColor: AppColors.cyberLime,
                                       behavior: SnackBarBehavior.floating,
+                                      action: SnackBarAction(
+                                        label: 'TEST',
+                                        textColor: Colors.black,
+                                        onPressed: () => _scheduleTestAlarm(),
+                                      ),
                                     ),
                                   );
                                 }
@@ -1371,6 +1410,15 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
       // Save schedule
       await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
+
+      // ═══════════════════════════════════════════════════════════════════
+      // 🔔 FIX 1: ACTUALLY SCHEDULE THE ALARM!
+      // ═══════════════════════════════════════════════════════════════════
+      if (hasAlarm) {
+        await WorkoutAlarmService.scheduleAlarm(schedule);
+        debugPrint('🔔 Alarm scheduled for ${schedule.workoutName} at ${schedule.scheduledTime}');
+      }
+      // ═══════════════════════════════════════════════════════════════════
 
       if (mounted) {
         final dateStr = DateFormat('MMM d').format(date);

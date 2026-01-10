@@ -1,9 +1,11 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 
 /// Modal for scheduling a workout with alarm
+/// Features a VISIBLE Cupertino-style time picker wheel
 class ScheduleWorkoutModal extends StatefulWidget {
   final DateTime selectedDate;
   
@@ -28,152 +30,139 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                     widget.selectedDate.day == DateTime.now().day;
     
     return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
-      decoration: const BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      // Taller to fit the time picker wheel
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: AppColors.cyberBlack,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(
+          color: AppColors.cyberLime.withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: SafeArea(
         child: Column(
           children: [
+            // Drag Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.white30,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            
             // Header
             Padding(
               padding: const EdgeInsets.all(20),
-              child: Column(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Schedule Workout',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              isToday ? 'Today, $dateStr' : dateStr,
-                              style: TextStyle(
-                                color: AppColors.cyberLime,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                      const Text(
+                        '⏰ SET ALARM',
+                        style: TextStyle(
+                          color: AppColors.cyberLime,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
                         ),
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Colors.white70),
+                      const SizedBox(height: 4),
+                      Text(
+                        isToday ? 'Today' : dateStr,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.white10,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.close, color: Colors.white70, size: 20),
+                    ),
                   ),
                 ],
               ),
             ),
 
+            // Content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Info card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.cyberLime.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.cyberLime.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, color: AppColors.cyberLime, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'One-time alarm for this specific date',
-                              style: TextStyle(
-                                color: AppColors.white90,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Alarm toggle
                     _buildAlarmToggle(),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Time picker
-                    if (_alarmEnabled) _buildTimePicker(),
+                    const SizedBox(height: 24),
+                    if (_alarmEnabled) ...[
+                      _buildTimePickerWheel(),
+                      const SizedBox(height: 16),
+                      _buildSelectedTimeDisplay(),
+                    ],
                   ],
                 ),
               ),
             ),
 
-            // Action buttons
-            Padding(
+            // Action Buttons
+            Container(
               padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.cyberBlack,
+                border: Border(top: BorderSide(color: AppColors.white10, width: 1)),
+              ),
               child: Column(
                 children: [
-                  // Primary button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
                       onPressed: () {
-                        HapticFeedback.mediumImpact();
+                        HapticFeedback.heavyImpact();
                         Navigator.pop(context, {
                           'time': _alarmEnabled ? _selectedTime : null,
-                          'repeatDays': <int>[], // No repeat days for one-time alarms
+                          'repeatDays': <int>[],
                         });
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.cyberLime,
                         foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: Text(
-                        _alarmEnabled ? '⏰ Set Alarm & Choose Workout' : 'Choose Workout',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(_alarmEnabled ? Icons.alarm_on : Icons.fitness_center, size: 22),
+                          const SizedBox(width: 10),
+                          Text(
+                            _alarmEnabled ? 'SET ALARM & CHOOSE WORKOUT' : 'CHOOSE WORKOUT',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  
                   const SizedBox(height: 12),
-                  
-                  // Secondary button
                   TextButton(
                     onPressed: () {
-                      Navigator.pop(context, {
-                        'time': null,
-                        'repeatDays': <int>[],
-                      });
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(context, {'time': null, 'repeatDays': <int>[]});
                     },
-                    child: const Text(
-                      'Skip Alarm',
-                      style: TextStyle(
-                        color: AppColors.white50,
-                        fontSize: 14,
-                      ),
-                    ),
+                    child: const Text('Skip Alarm', style: TextStyle(color: AppColors.white50, fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -185,110 +174,131 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
   }
 
   Widget _buildAlarmToggle() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white5,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.white10),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.alarm, color: AppColors.cyberLime, size: 24),
-              SizedBox(width: 12),
-              Column(
+    return GestureDetector(
+      onTap: () {
+        setState(() => _alarmEnabled = !_alarmEnabled);
+        HapticFeedback.selectionClick();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _alarmEnabled ? AppColors.cyberLime.withOpacity(0.1) : AppColors.white5,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _alarmEnabled ? AppColors.cyberLime.withOpacity(0.5) : AppColors.white10,
+            width: _alarmEnabled ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _alarmEnabled ? AppColors.cyberLime.withOpacity(0.2) : AppColors.white10,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.alarm, color: _alarmEnabled ? AppColors.cyberLime : AppColors.white50, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Set Alarm',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    'Get notified when it\'s workout time',
-                    style: TextStyle(
-                      color: AppColors.white50,
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text('Workout Alarm', style: TextStyle(color: _alarmEnabled ? Colors.white : AppColors.white70, fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(_alarmEnabled ? 'Get reminded when it\'s time to train' : 'No reminder set', style: const TextStyle(color: AppColors.white50, fontSize: 12)),
                 ],
               ),
-            ],
+            ),
+            Switch(
+              value: _alarmEnabled,
+              onChanged: (value) {
+                setState(() => _alarmEnabled = value);
+                HapticFeedback.selectionClick();
+              },
+              activeColor: AppColors.cyberLime,
+              activeTrackColor: AppColors.cyberLime.withOpacity(0.3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VISIBLE TIME PICKER WHEEL (Cupertino Style)
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildTimePickerWheel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white5,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cyberLime.withOpacity(0.3), width: 1),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.access_time, color: AppColors.cyberLime, size: 18),
+                const SizedBox(width: 8),
+                const Text('SELECT TIME', style: TextStyle(color: AppColors.white70, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
+              ],
+            ),
           ),
-          Switch(
-            value: _alarmEnabled,
-            onChanged: (value) {
-              setState(() => _alarmEnabled = value);
-              HapticFeedback.selectionClick();
-            },
-            activeColor: AppColors.cyberLime,
+          
+          // 🔥 CUPERTINO TIME PICKER WHEEL - VISIBLE AND SCROLLABLE
+          SizedBox(
+            height: 180,
+            child: CupertinoTheme(
+              data: const CupertinoThemeData(
+                brightness: Brightness.dark,
+                textTheme: CupertinoTextThemeData(
+                  dateTimePickerTextStyle: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
+                ),
+              ),
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.time,
+                initialDateTime: DateTime(2024, 1, 1, _selectedTime.hour, _selectedTime.minute),
+                use24hFormat: false,
+                onDateTimeChanged: (DateTime dateTime) {
+                  setState(() {
+                    _selectedTime = TimeOfDay(hour: dateTime.hour, minute: dateTime.minute);
+                  });
+                  HapticFeedback.selectionClick();
+                },
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTimePicker() {
+  Widget _buildSelectedTimeDisplay() {
+    final hour = _selectedTime.hourOfPeriod == 0 ? 12 : _selectedTime.hourOfPeriod;
+    final minute = _selectedTime.minute.toString().padLeft(2, '0');
+    final period = _selectedTime.period == DayPeriod.am ? 'AM' : 'PM';
+    
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
       decoration: BoxDecoration(
-        color: AppColors.white5,
+        gradient: LinearGradient(colors: [AppColors.cyberLime.withOpacity(0.2), AppColors.electricCyan.withOpacity(0.1)]),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.white10),
+        border: Border.all(color: AppColors.cyberLime.withOpacity(0.5), width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            'Alarm Time',
-            style: TextStyle(
-              color: AppColors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () async {
-              final time = await showTimePicker(
-                context: context,
-                initialTime: _selectedTime,
-              );
-              if (time != null) {
-                setState(() => _selectedTime = time);
-                HapticFeedback.selectionClick();
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.cyberLime, AppColors.electricCyan],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.access_time, color: Colors.black),
-                  const SizedBox(width: 12),
-                  Text(
-                    _selectedTime.format(context),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          const Icon(Icons.alarm_on, color: AppColors.cyberLime, size: 28),
+          const SizedBox(width: 12),
+          Text('$hour:$minute', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 2)),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(color: AppColors.cyberLime, borderRadius: BorderRadius.circular(6)),
+            child: Text(period, style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w900)),
           ),
         ],
       ),
