@@ -1430,6 +1430,17 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     debugPrint('⏰ Time data: $timeData');
     debugPrint('🔔 Has alarm: $hasAlarm');
 
+    // Get the weekday for repeatDays (0=Sunday, 1=Monday... 6=Saturday)
+    // Dart: Monday=1, Tuesday=2... Sunday=7
+    // Our model: Sunday=0, Monday=1... Saturday=6
+    final weekday = date.weekday == 7 ? 0 : date.weekday;
+    
+    // If user sets alarm, add the weekday to repeatDays
+    final repeatDays = hasAlarm ? [weekday] : <int>[];
+
+    debugPrint('📅 Weekday for schedule: $weekday (${_getDayName(weekday)})');
+    debugPrint('🔁 RepeatDays: $repeatDays');
+
     // Create schedule
     final schedule = WorkoutSchedule(
       id: '${DateTime.now().millisecondsSinceEpoch}',
@@ -1441,7 +1452,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           : null,
       hasAlarm: hasAlarm,
       createdAt: DateTime.now(),
-      repeatDays: [], // No repeat - one-time schedule
+      repeatDays: repeatDays, // Add the weekday so alarm schedules!
     );
 
     debugPrint('📋 Created schedule:');
@@ -1787,6 +1798,20 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     return _selectedDate.year == now.year &&
            _selectedDate.month == now.month &&
            _selectedDate.day == now.day;
+  }
+
+  /// Get day name for logging (copied from FutureYou)
+  String _getDayName(int day) {
+    const days = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday'
+    ];
+    return days[day];
   }
 }
 
