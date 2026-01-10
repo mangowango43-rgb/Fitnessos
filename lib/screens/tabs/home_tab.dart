@@ -883,6 +883,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   }
 
   Widget _buildNoWorkoutCard(BuildContext context) {
+    final isToday = _isSelectedDateToday();
+    final dateStr = isToday ? 'Today' : DateFormat('MMM d').format(_selectedDate);
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -903,14 +906,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       child: Column(
         children: [
           const Icon(
-            Icons.add_circle_outline,
+            Icons.calendar_today_outlined,
             color: AppColors.cyberLime,
             size: 48,
           ),
           const SizedBox(height: 16),
-          const Text(
-            'No Workout Scheduled',
-            style: TextStyle(
+          Text(
+            'No Workout on $dateStr',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w900,
@@ -918,7 +921,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Create or select a workout to get started',
+            'Schedule a workout for this date',
             style: TextStyle(
               color: AppColors.white60,
               fontSize: 14,
@@ -926,29 +929,79 @@ class _HomeTabState extends ConsumerState<HomeTab> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.heavyImpact();
-              final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-              if (navigator != null) {
-                (navigator as dynamic).changeTab(2); // Workouts tab
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppColors.cyberLime,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Text(
-                'Browse Workouts',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
+
+          // Two buttons: Quick schedule (no alarm) + Schedule with alarm
+          Row(
+            children: [
+              // Quick schedule (no alarm)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    HapticFeedback.mediumImpact();
+                    debugPrint('🚀 QUICK ADD tapped for date: $_selectedDate');
+                    await _openWorkoutLibrary();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.white10,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.white20),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.fitness_center, color: Colors.white, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'QUICK ADD',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+
+              const SizedBox(width: 12),
+
+              // Schedule with alarm
+              Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    HapticFeedback.heavyImpact();
+                    debugPrint('⏰ WITH ALARM tapped for date: $_selectedDate');
+                    await _openScheduleWorkoutFlow(_selectedDate);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.cyberLime,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.alarm, color: Colors.black, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'WITH ALARM',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1772,6 +1825,14 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       // Also check custom workouts
       return null; // We'll handle custom workouts later if needed
     }
+  }
+
+  /// Helper method to check if selected date is today
+  bool _isSelectedDateToday() {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+           _selectedDate.month == now.month &&
+           _selectedDate.day == now.day;
   }
 }
 
