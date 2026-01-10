@@ -22,6 +22,7 @@ class PushPattern implements BasePattern {
   bool _baselineCaptured = false;
   int _repCount = 0;
   String _feedback = "";
+  bool _justHitTrigger = false;
   
   // Baseline
   double _baselineTarget = 0; // Y-distance between shoulders and wrists at start
@@ -51,6 +52,8 @@ class PushPattern implements BasePattern {
   int get repCount => _repCount;
   @override
   String get feedback => _feedback;
+  @override
+  bool get justHitTrigger => _justHitTrigger;
   
   @override
   double get chargeProgress {
@@ -103,6 +106,8 @@ class PushPattern implements BasePattern {
       _feedback = "Waiting for lock";
       return false;
     }
+
+    _justHitTrigger = false;
     
     final lShoulder = map[PoseLandmarkType.leftShoulder];
     final rShoulder = map[PoseLandmarkType.rightShoulder];
@@ -143,6 +148,7 @@ class PushPattern implements BasePattern {
             _state = RepState.down;
             _feedback = cueGood;
             _intentTimer = null;
+            _justHitTrigger = true;
           } else {
             _state = RepState.goingDown;
           }
@@ -164,6 +170,7 @@ class PushPattern implements BasePattern {
             _state = RepState.down;
             _feedback = cueGood;
             _intentTimer = null;
+            _justHitTrigger = true;
           }
         } else {
           _intentTimer = null;
@@ -202,6 +209,7 @@ class PushPattern implements BasePattern {
     _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
     _smoothedPercentage = 100;
     _currentPercentage = 100;
+    _justHitTrigger = false;
   }
 }
 

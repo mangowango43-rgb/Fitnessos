@@ -16,6 +16,7 @@ abstract class BasePattern {
   int get repCount;
   String get feedback;
   double get chargeProgress; // 0.0 to 1.0 for power gauge
+  bool get justHitTrigger; // <-- ADDED for UI green flash
   
   // Actions
   void captureBaseline(Map<PoseLandmarkType, PoseLandmark> landmarks);

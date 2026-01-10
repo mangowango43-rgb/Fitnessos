@@ -24,6 +24,7 @@ class SquatPattern implements BasePattern {
   bool _baselineCaptured = false;
   int _repCount = 0;
   String _feedback = "";
+  bool _justHitTrigger = false;
   
   // Baseline
   double _baselineTarget = 0; // Hip-to-ankle distance at start
@@ -56,6 +57,8 @@ class SquatPattern implements BasePattern {
   int get repCount => _repCount;
   @override
   String get feedback => _feedback;
+  @override
+  bool get justHitTrigger => _justHitTrigger;
   
   @override
   double get chargeProgress {
@@ -112,6 +115,8 @@ class SquatPattern implements BasePattern {
       return false;
     }
     
+    _justHitTrigger = false;
+    
     final lHip = map[PoseLandmarkType.leftHip];
     final rHip = map[PoseLandmarkType.rightHip];
     final lAnkle = map[PoseLandmarkType.leftAnkle];
@@ -154,6 +159,7 @@ class SquatPattern implements BasePattern {
             _state = RepState.down;
             _feedback = cueGood;
             _intentTimer = null;
+            _justHitTrigger = true;
           } else {
             _state = RepState.goingDown;
           }
@@ -175,6 +181,7 @@ class SquatPattern implements BasePattern {
             _state = RepState.down;
             _feedback = cueGood;
             _intentTimer = null;
+            _justHitTrigger = true;
           }
         } else {
           _intentTimer = null;
@@ -213,6 +220,7 @@ class SquatPattern implements BasePattern {
     _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
     _smoothedPercentage = 100;
     _currentPercentage = 100;
+    _justHitTrigger = false;
   }
 }
 

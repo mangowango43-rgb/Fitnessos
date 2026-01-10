@@ -22,6 +22,7 @@ class CurlPattern implements BasePattern {
   bool _baselineCaptured = false;
   int _repCount = 0;
   String _feedback = "";
+  bool _justHitTrigger = false;
   
   // Current values - wrist position as % between hip and shoulder
   double _curlProgress = 0; // 0% = at hip, 100% = at shoulder
@@ -48,6 +49,8 @@ class CurlPattern implements BasePattern {
   int get repCount => _repCount;
   @override
   String get feedback => _feedback;
+  @override
+  bool get justHitTrigger => _justHitTrigger;
   
   @override
   double get chargeProgress {
@@ -83,6 +86,8 @@ class CurlPattern implements BasePattern {
       _feedback = "Waiting for lock";
       return false;
     }
+
+    _justHitTrigger = false;
     
     final lShoulder = map[PoseLandmarkType.leftShoulder];
     final rShoulder = map[PoseLandmarkType.rightShoulder];
@@ -133,6 +138,7 @@ class CurlPattern implements BasePattern {
             _state = RepState.down;
             _feedback = cueGood;
             _intentTimer = null;
+            _justHitTrigger = true;
           } else {
             _state = RepState.goingDown;
           }
@@ -150,6 +156,7 @@ class CurlPattern implements BasePattern {
             _state = RepState.down;
             _feedback = cueGood;
             _intentTimer = null;
+            _justHitTrigger = true;
           }
         } else {
           _intentTimer = null;
@@ -188,6 +195,7 @@ class CurlPattern implements BasePattern {
     _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
     _smoothedCurlProgress = 0;
     _curlProgress = 0;
+    _justHitTrigger = false;
   }
 }
 

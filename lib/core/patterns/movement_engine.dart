@@ -1,361 +1,361 @@
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'base_pattern.dart';
 import 'squat_pattern.dart';
-import 'hinge_pattern.dart';
 import 'push_pattern.dart';
 import 'pull_pattern.dart';
+import 'hinge_pattern.dart';
 import 'curl_pattern.dart';
+import 'knee_drive_pattern.dart';
+import 'hold_pattern.dart';
+import 'rotation_pattern.dart';
+import 'calf_pattern.dart';
+
+/// Pattern types
+enum PatternType { squat, push, pull, hinge, curl, kneeDrive, hold, rotation, calf }
+
+/// Exercise configuration
+class ExerciseConfig {
+  final PatternType patternType;
+  final Map<String, dynamic> params;
+  
+  const ExerciseConfig({
+    required this.patternType,
+    this.params = const {},
+  });
+}
 
 /// =============================================================================
-/// MOVEMENT ENGINE - The Boss
+/// MOVEMENT ENGINE - Master Controller
 /// =============================================================================
-/// This is the single entry point for the rep counting system.
-/// It picks the right pattern based on exercise ID and delegates all work.
+/// Maps 150+ exercises to their pattern type.
+/// Creates the right pattern instance for each exercise.
 /// =============================================================================
-
-enum MovementType { squat, hinge, push, pull, curl }
 
 class MovementEngine {
   BasePattern? _activePattern;
-  String _currentExerciseId = "";
+  String? _currentExerciseId;
   
   // Getters - delegate to active pattern
-  bool get isLocked => _activePattern?.isLocked ?? false;
   int get repCount => _activePattern?.repCount ?? 0;
-  String get feedback => _activePattern?.feedback ?? "";
+  String get feedback => _activePattern?.feedback ?? '';
+  double get chargeProgress => _activePattern?.chargeProgress ?? 0;
+  bool get justHitTrigger => _activePattern?.justHitTrigger ?? false;
+  bool get isLocked => _activePattern?.isLocked ?? false;
   RepState get state => _activePattern?.state ?? RepState.ready;
-  double get chargeProgress => _activePattern?.chargeProgress ?? 0.0;
+  String? get currentExerciseId => _currentExerciseId;
   
-  /// Load a pattern for an exercise
-  void loadExercise(String exerciseId) {
+  /// Set the current exercise - creates the appropriate pattern
+  void setExercise(String exerciseId) {
     _currentExerciseId = exerciseId.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
-    _activePattern = _getPatternForExercise(_currentExerciseId);
+    
+    final config = exercises[_currentExerciseId];
+    if (config == null) {
+      // Default to squat pattern for unknown exercises
+      _activePattern = SquatPattern();
+      return;
+    }
+    
+    _activePattern = _createPattern(config);
   }
   
-  /// Capture baseline for current exercise
-  void captureBaseline(List<PoseLandmark> landmarks) {
-    if (_activePattern == null) return;
-    final map = {for (var lm in landmarks) lm.type: lm};
-    _activePattern!.captureBaseline(map);
+  /// Capture baseline position
+  void captureBaseline(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    _activePattern?.captureBaseline(landmarks);
   }
   
   /// Process a frame - returns true if rep was counted
-  bool processFrame(List<PoseLandmark> landmarks) {
-    if (_activePattern == null) return false;
-    final map = {for (var lm in landmarks) lm.type: lm};
-    return _activePattern!.processFrame(map);
+  bool processFrame(Map<PoseLandmarkType, PoseLandmark> landmarks) {
+    return _activePattern?.processFrame(landmarks) ?? false;
   }
   
-  /// Reset the counter
+  /// Reset the current pattern
   void reset() {
     _activePattern?.reset();
   }
   
-  /// Check if we have a pattern for an exercise
-  static bool hasPattern(String exerciseId) {
-    final normalized = exerciseId.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
-    return _exerciseToType.containsKey(normalized);
-  }
-  
-  // =========================================================================
-  // EXERCISE MAPPING - Which exercises use which pattern
-  // =========================================================================
-  
-  BasePattern _getPatternForExercise(String exerciseId) {
-    final type = _exerciseToType[exerciseId] ?? MovementType.squat;
-    final config = _exerciseConfig[exerciseId];
-    
-    switch (type) {
-      case MovementType.squat:
+  /// Create pattern instance from config
+  BasePattern _createPattern(ExerciseConfig config) {
+    switch (config.patternType) {
+      case PatternType.squat:
         return SquatPattern(
-          triggerPercent: config?['trigger'] ?? 0.78,
-          resetPercent: config?['reset'] ?? 0.92,
-          cueGood: config?['cueGood'] ?? "Depth!",
-          cueBad: config?['cueBad'] ?? "Hit parallel!",
+          triggerPercent: config.params['triggerPercent'] ?? 0.78,
+          resetPercent: config.params['resetPercent'] ?? 0.92,
+          cueGood: config.params['cueGood'] ?? 'Depth!',
+          cueBad: config.params['cueBad'] ?? 'Lower!',
         );
-      case MovementType.hinge:
-        return HingePattern(
-          triggerAngle: config?['trigger'] ?? 105,
-          resetAngle: config?['reset'] ?? 165,
-          cueGood: config?['cueGood'] ?? "Lockout!",
-          cueBad: config?['cueBad'] ?? "Hips forward!",
-        );
-      case MovementType.push:
+        
+      case PatternType.push:
         return PushPattern(
-          cueGood: config?['cueGood'] ?? "Perfect!",
-          cueBad: config?['cueBad'] ?? "Go lower!",
+          cueGood: config.params['cueGood'] ?? 'Perfect!',
+          cueBad: config.params['cueBad'] ?? 'Go lower!',
         );
-      case MovementType.pull:
+        
+      case PatternType.pull:
         return PullPattern(
-          triggerAngle: config?['trigger'] ?? 75,
-          resetAngle: config?['reset'] ?? 155,
-          cueGood: config?['cueGood'] ?? "Chin up!",
-          cueBad: config?['cueBad'] ?? "Full hang!",
+          triggerAngle: config.params['triggerAngle'] ?? 75,
+          resetAngle: config.params['resetAngle'] ?? 155,
+          cueGood: config.params['cueGood'] ?? 'Chin up!',
+          cueBad: config.params['cueBad'] ?? 'Full hang!',
         );
-      case MovementType.curl:
+        
+      case PatternType.hinge:
+        return HingePattern(
+          triggerAngle: config.params['triggerAngle'] ?? 105,
+          resetAngle: config.params['resetAngle'] ?? 165,
+          cueGood: config.params['cueGood'] ?? 'Lockout!',
+          cueBad: config.params['cueBad'] ?? 'Hips forward!',
+        );
+        
+      case PatternType.curl:
         return CurlPattern(
-          cueGood: config?['cueGood'] ?? "Full curl!",
-          cueBad: config?['cueBad'] ?? "Squeeze!",
+          cueGood: config.params['cueGood'] ?? 'Full curl!',
+          cueBad: config.params['cueBad'] ?? 'Squeeze!',
+        );
+        
+      case PatternType.kneeDrive:
+        return KneeDrivePattern(
+          triggerPercent: config.params['triggerPercent'] ?? 0.15,
+          cueGood: config.params['cueGood'] ?? 'Drive!',
+          cueBad: config.params['cueBad'] ?? 'Knees up!',
+        );
+        
+      case PatternType.hold:
+        return HoldPattern(
+          holdType: config.params['holdType'] ?? HoldType.plank,
+          cueGood: config.params['cueGood'] ?? 'Hold it!',
+          cueBad: config.params['cueBad'] ?? 'Get in position!',
+        );
+        
+      case PatternType.rotation:
+        return RotationPattern(
+          triggerAngle: config.params['triggerAngle'] ?? 45,
+          cueGood: config.params['cueGood'] ?? 'Twist!',
+          cueBad: config.params['cueBad'] ?? 'Rotate more!',
+        );
+        
+      case PatternType.calf:
+        return CalfPattern(
+          cueGood: config.params['cueGood'] ?? 'Squeeze!',
+          cueBad: config.params['cueBad'] ?? 'Higher!',
         );
     }
   }
   
-  // Map exercise ID to movement type
-  static final Map<String, MovementType> _exerciseToType = {
-
-  // ============================================================================
-  // GYM - CHEST
-  // ============================================================================
-  'barbell_bench_press': MovementType.push,
-  'incline_db_press': MovementType.push,
-  'decline_bench_press': MovementType.push,
-  'cable_crossover': MovementType.push,
-  'machine_chest_fly': MovementType.push,
-  'dumbbell_flyes': MovementType.push,
-  'pushups': MovementType.push,
-  'chest_dips': MovementType.push,
-
-  // ============================================================================
-  // GYM - BACK
-  // ============================================================================
-  'deadlift': MovementType.hinge,
-  'barbell_row': MovementType.pull,
-  'lat_pulldown': MovementType.pull,
-  'seated_cable_row': MovementType.pull,
-  'tbar_row': MovementType.pull,
-  'single_arm_db_row': MovementType.pull,
-  'face_pulls': MovementType.pull,
-  'pullups': MovementType.pull,
-  'dumbbell_row': MovementType.pull,
-  'renegade_rows': MovementType.pull,
-
-  // ============================================================================
-  // GYM - SHOULDERS
-  // ============================================================================
-  'overhead_press': MovementType.push,
-  'seated_db_press': MovementType.push,
-  'arnold_press': MovementType.push,
-  'lateral_raise': MovementType.push,
-  'front_raise': MovementType.push,
-  'reverse_fly': MovementType.push,
-  'cable_lateral_raise': MovementType.push,
-  'barbell_shrugs': MovementType.push,
-  'shoulder_press': MovementType.push,
-
-  // ============================================================================
-  // GYM - LEGS
-  // ============================================================================
-  'back_squat': MovementType.squat,
-  'front_squat': MovementType.squat,
-  'romanian_deadlift': MovementType.hinge,
-  'leg_press': MovementType.squat,
-  'bulgarian_split_squat': MovementType.squat,
-  'leg_extension': MovementType.squat,
-  'leg_curl': MovementType.squat,
-  'hip_thrust': MovementType.hinge,
-  'glute_kickback': MovementType.hinge,
-  'standing_calf_raise': MovementType.squat,
-  'sumo_squat': MovementType.squat,
-  'sumo_deadlift': MovementType.hinge,
-  'goblet_squats': MovementType.squat,
-  'walking_lunges': MovementType.squat,
-  'box_stepups': MovementType.squat,
-  'box_jumps': MovementType.squat,
-
-  // ============================================================================
-  // GYM - ARMS
-  // ============================================================================
-  'barbell_curl': MovementType.curl,
-  'hammer_curl': MovementType.curl,
-  'preacher_curl': MovementType.curl,
-  'skull_crushers': MovementType.curl,
-  'concentration_curl': MovementType.curl,
-  'tricep_pushdown': MovementType.curl,
-  'overhead_tricep_ext': MovementType.curl,
-  'close_grip_bench': MovementType.push,
-  'cable_curl': MovementType.curl,
-  'tricep_dips': MovementType.push,
-  'bicep_curls': MovementType.curl,
-
-  // ============================================================================
-  // GYM - CORE
-  // ============================================================================
-  'cable_crunch': MovementType.squat,
-  'hanging_leg_raise': MovementType.squat,
-  'ab_wheel_rollout': MovementType.squat,
-  'russian_twist': MovementType.squat,
-  'woodchoppers': MovementType.squat,
-  'decline_situp': MovementType.squat,
-  'plank': MovementType.squat,
-  'side_plank': MovementType.squat,
-  'plank_hold': MovementType.squat,
-
-  // ============================================================================
-  // GYM - CIRCUITS
-  // ============================================================================
-  'barbell_squat_press': MovementType.squat,
-  'battle_ropes': MovementType.squat,
-  'thrusters': MovementType.squat,
-  'kettlebell_swings': MovementType.hinge,
-
-  // ============================================================================
-  // GYM - BOOTY BUILDER
-  // ============================================================================
-  'cable_kickback': MovementType.hinge,
-  'glute_bridge_single': MovementType.hinge,
-  'cable_pullthrough': MovementType.hinge,
-  'barbell_hip_thrust': MovementType.hinge,
-  'leg_press_high': MovementType.squat,
-  'donkey_kicks_cable': MovementType.hinge,
-
-  // ============================================================================
-  // HOME - BODYWEIGHT BASICS
-  // ============================================================================
-  'air_squats': MovementType.squat,
-  'lunges': MovementType.squat,
-  'superman_raises': MovementType.squat,
-  'glute_bridge': MovementType.hinge,
-  'mountain_climbers': MovementType.squat,
-  'diamond_pushups': MovementType.push,
-  'wide_pushups': MovementType.push,
-  'pike_pushups': MovementType.push,
-  'tricep_dips_chair': MovementType.push,
-  'plank_shoulder_taps': MovementType.push,
-  'single_leg_glute_bridge': MovementType.hinge,
-  'stepups_chair': MovementType.squat,
-  'wall_sit': MovementType.squat,
-  'calf_raises': MovementType.squat,
-  'bicycle_crunches': MovementType.squat,
-  'leg_raises': MovementType.squat,
-  'dead_bug': MovementType.squat,
-
-  // ============================================================================
-  // HOME - HIIT CIRCUITS
-  // ============================================================================
-  'burpees': MovementType.squat,
-  'jump_squats': MovementType.squat,
-  'high_knees': MovementType.squat,
-  'jump_lunges': MovementType.squat,
-  'squat_jumps': MovementType.squat,
-  'plank_jacks': MovementType.squat,
-  'jumping_jacks': MovementType.squat,
-  'butt_kicks': MovementType.squat,
-  'skaters': MovementType.squat,
-
-  // ============================================================================
-  // HOME - BOOTY
-  // ============================================================================
-  'donkey_kicks': MovementType.hinge,
-  'fire_hydrants': MovementType.squat,
-  'clamshells': MovementType.squat,
-  'frog_pumps': MovementType.hinge,
-  'sumo_squat_pulse': MovementType.squat,
-  'curtsy_lunges': MovementType.squat,
-  'glute_bridge_hold': MovementType.hinge,
-  'donkey_kick_pulses': MovementType.hinge,
-  'squat_to_kickback': MovementType.squat,
-  'single_leg_deadlift': MovementType.hinge,
-  'banded_squat': MovementType.squat,
-  'banded_glute_bridge': MovementType.hinge,
-  'banded_clamshell': MovementType.squat,
-  'banded_kickback': MovementType.hinge,
-  'banded_lateral_walk': MovementType.squat,
-  'banded_fire_hydrant': MovementType.squat,
-
-  // ============================================================================
-  // HOME - RECOVERY & STRETCHES
-  // ============================================================================
-  'cat_cow': MovementType.squat,
-  'worlds_greatest_stretch': MovementType.squat,
-  'pigeon_pose': MovementType.squat,
-  'hamstring_stretch': MovementType.squat,
-  'quad_stretch': MovementType.squat,
-  'chest_doorway_stretch': MovementType.squat,
-  'childs_pose': MovementType.squat,
-  '90_90_stretch': MovementType.squat,
-  'frog_stretch': MovementType.squat,
-  'hip_flexor_stretch': MovementType.squat,
-  'happy_baby': MovementType.squat,
-  'butterfly_stretch': MovementType.squat,
-
-  // ============================================================================
-  // ALIASES (different names for same exercises)
-  // ============================================================================
-  'push_ups': MovementType.push,
-  'pull_ups': MovementType.pull,
-  'chin_ups': MovementType.pull,
-  'lat_pulldowns': MovementType.pull,
-  'bent_over_rows': MovementType.pull,
-  'cable_rows': MovementType.pull,
-  't_bar_rows': MovementType.pull,
-  'hammer_curls': MovementType.curl,
-  'preacher_curls': MovementType.curl,
-  'concentration_curls': MovementType.curl,
-  'cable_curls': MovementType.curl,
-  'tricep_extensions': MovementType.curl,
-  'overhead_tricep': MovementType.curl,
-  'tricep_kickbacks': MovementType.curl,
-  'ez_bar_curl': MovementType.curl,
-  'incline_curls': MovementType.curl,
-  'lateral_raises': MovementType.push,
-  'front_raises': MovementType.push,
-  'rear_delt_flys': MovementType.push,
-  'reverse_flys': MovementType.pull,
-  'shrugs': MovementType.push,
-  'upright_rows': MovementType.pull,
-  'squats': MovementType.squat,
-  'sit_ups': MovementType.squat,
-  'situps': MovementType.squat,
-  'crunches': MovementType.squat,
-  'decline_sit_up': MovementType.squat,
-  'russian_twists': MovementType.squat,
-  'superman': MovementType.squat,
-  'sprawls': MovementType.squat,
-  'star_jumps': MovementType.squat,
-  'tuck_jumps': MovementType.squat,
-  'bear_crawls': MovementType.squat,
-  'lateral_hops': MovementType.squat,
-  'step_ups': MovementType.squat,
-  'leg_extensions': MovementType.squat,
-  'leg_curls': MovementType.squat,
-  'wall_sits': MovementType.squat,
-  'reverse_lunges': MovementType.squat,
-  'stiff_leg_deadlift': MovementType.hinge,
-  'good_mornings': MovementType.hinge,
-  'bench_press': MovementType.push,
-  'incline_press': MovementType.push,
-  'decline_press': MovementType.push,
-  'dumbbell_press': MovementType.push,
-  'close_grip_push_ups': MovementType.push,
-  'dips_chest': MovementType.push,
-  'pike_push_ups': MovementType.push,
-  'plank_to_pushup': MovementType.push,
-  'chest_flys': MovementType.push,
-  'cable_crossovers': MovementType.push,
-  'cable_lateral_raise': MovementType.push,
-  'pendlay_row': MovementType.pull,
-};
-  
-  // Custom config per exercise (optional overrides)
-  static final Map<String, Map<String, dynamic>> _exerciseConfig = {
-    // Squats
-    'squats': {'trigger': 0.78, 'reset': 0.92, 'cueGood': 'Depth!', 'cueBad': 'Hit parallel!'},
-    'jump_squats': {'trigger': 0.80, 'reset': 0.92, 'cueGood': 'Explode!', 'cueBad': 'Lower!'},
-    'wall_sits': {'trigger': 0.80, 'reset': 0.85, 'cueGood': 'Hold!', 'cueBad': '90 degrees!'},
-    'lunges': {'trigger': 0.78, 'reset': 0.92, 'cueGood': 'Great step!', 'cueBad': 'Deeper!'},
-    'burpees': {'trigger': 0.65, 'reset': 0.90, 'cueGood': 'Explode!', 'cueBad': 'Chest down!'},
+  /// ==========================================================================
+  /// EXERCISE DATABASE - 150+ exercises mapped to patterns
+  /// ==========================================================================
+  static const Map<String, ExerciseConfig> exercises = {
+    // ===== SQUAT PATTERN =====
+    'squat': ExerciseConfig(patternType: PatternType.squat),
+    'air_squat': ExerciseConfig(patternType: PatternType.squat),
+    'bodyweight_squat': ExerciseConfig(patternType: PatternType.squat),
+    'goblet_squat': ExerciseConfig(patternType: PatternType.squat),
+    'barbell_squat': ExerciseConfig(patternType: PatternType.squat),
+    'back_squat': ExerciseConfig(patternType: PatternType.squat),
+    'front_squat': ExerciseConfig(patternType: PatternType.squat),
+    'sumo_squat': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'split_squat': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'bulgarian_split_squat': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'lunge': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75, 'resetPercent': 0.90}),
+    'walking_lunge': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75, 'resetPercent': 0.90}),
+    'reverse_lunge': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75, 'resetPercent': 0.90}),
+    'lateral_lunge': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'curtsy_lunge': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'jump_squat': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.80}),
+    'jump_lunge': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'box_jump': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.80}),
+    'step_up': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.80}),
+    'box_step_up': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.80}),
+    'pistol_squat': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.70}),
+    'sissy_squat': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'hack_squat': ExerciseConfig(patternType: PatternType.squat),
+    'leg_press': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'sit_up': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.85, 'resetPercent': 0.95}),
+    'crunch': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.90, 'resetPercent': 0.97}),
+    'v_up': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.70}),
+    'leg_raise': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75}),
+    'burpee': ExerciseConfig(patternType: PatternType.squat, params: {'triggerPercent': 0.75, 'resetPercent': 0.90}),
+    'thruster': ExerciseConfig(patternType: PatternType.squat),
+    'wall_ball': ExerciseConfig(patternType: PatternType.squat),
     
-    // Hinges
-    'deadlift': {'trigger': 105.0, 'reset': 165.0, 'cueGood': 'Lockout!', 'cueBad': 'Hips forward!'},
-    'glute_bridge': {'trigger': 160.0, 'reset': 110.0, 'cueGood': 'Squeeze!', 'cueBad': 'Hips up!'},
-    'kettlebell_swings': {'trigger': 110.0, 'reset': 170.0, 'cueGood': 'Snap!', 'cueBad': 'Hips drive!'},
+    // ===== PUSH PATTERN =====
+    'pushup': ExerciseConfig(patternType: PatternType.push),
+    'push_up': ExerciseConfig(patternType: PatternType.push),
+    'wide_pushup': ExerciseConfig(patternType: PatternType.push),
+    'diamond_pushup': ExerciseConfig(patternType: PatternType.push),
+    'close_grip_pushup': ExerciseConfig(patternType: PatternType.push),
+    'decline_pushup': ExerciseConfig(patternType: PatternType.push),
+    'incline_pushup': ExerciseConfig(patternType: PatternType.push),
+    'pike_pushup': ExerciseConfig(patternType: PatternType.push),
+    'archer_pushup': ExerciseConfig(patternType: PatternType.push),
+    'clap_pushup': ExerciseConfig(patternType: PatternType.push),
+    'bench_press': ExerciseConfig(patternType: PatternType.push),
+    'barbell_bench_press': ExerciseConfig(patternType: PatternType.push),
+    'dumbbell_bench_press': ExerciseConfig(patternType: PatternType.push),
+    'incline_bench_press': ExerciseConfig(patternType: PatternType.push),
+    'incline_press': ExerciseConfig(patternType: PatternType.push),
+    'decline_bench_press': ExerciseConfig(patternType: PatternType.push),
+    'decline_press': ExerciseConfig(patternType: PatternType.push),
+    'dumbbell_press': ExerciseConfig(patternType: PatternType.push),
+    'overhead_press': ExerciseConfig(patternType: PatternType.push),
+    'shoulder_press': ExerciseConfig(patternType: PatternType.push),
+    'military_press': ExerciseConfig(patternType: PatternType.push),
+    'arnold_press': ExerciseConfig(patternType: PatternType.push),
+    'push_press': ExerciseConfig(patternType: PatternType.push),
+    'dips': ExerciseConfig(patternType: PatternType.push),
+    'tricep_dips': ExerciseConfig(patternType: PatternType.push),
+    'bench_dips': ExerciseConfig(patternType: PatternType.push),
+    'ring_dips': ExerciseConfig(patternType: PatternType.push),
+    'chest_fly': ExerciseConfig(patternType: PatternType.push),
+    'dumbbell_fly': ExerciseConfig(patternType: PatternType.push),
+    'cable_fly': ExerciseConfig(patternType: PatternType.push),
+    'cable_crossover': ExerciseConfig(patternType: PatternType.push),
+    'machine_chest_press': ExerciseConfig(patternType: PatternType.push),
+    'landmine_press': ExerciseConfig(patternType: PatternType.push),
     
-    // Pulls
-    'pull_ups': {'trigger': 75.0, 'reset': 155.0, 'cueGood': 'Chin up!', 'cueBad': 'Full hang!'},
-    'bent_over_rows': {'trigger': 80.0, 'reset': 150.0, 'cueGood': 'Pull!', 'cueBad': 'Squeeze lats!'},
+    // ===== PULL PATTERN =====
+    'pullup': ExerciseConfig(patternType: PatternType.pull),
+    'pull_up': ExerciseConfig(patternType: PatternType.pull),
+    'chinup': ExerciseConfig(patternType: PatternType.pull),
+    'chin_up': ExerciseConfig(patternType: PatternType.pull),
+    'wide_grip_pullup': ExerciseConfig(patternType: PatternType.pull),
+    'close_grip_pullup': ExerciseConfig(patternType: PatternType.pull),
+    'neutral_grip_pullup': ExerciseConfig(patternType: PatternType.pull),
+    'muscle_up': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 60}),
+    'lat_pulldown': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 80, 'resetAngle': 160}),
+    'cable_pulldown': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 80, 'resetAngle': 160}),
+    'bent_over_row': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 70, 'resetAngle': 150}),
+    'barbell_row': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 70, 'resetAngle': 150}),
+    'dumbbell_row': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 70, 'resetAngle': 150}),
+    'single_arm_row': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 70, 'resetAngle': 150}),
+    'cable_row': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 75, 'resetAngle': 155}),
+    'seated_row': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 75, 'resetAngle': 155}),
+    'face_pull': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 80, 'resetAngle': 150}),
+    'reverse_fly': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 90, 'resetAngle': 160}),
+    't_bar_row': ExerciseConfig(patternType: PatternType.pull, params: {'triggerAngle': 70, 'resetAngle': 150}),
+    'inverted_row': ExerciseConfig(patternType: PatternType.pull),
     
-    // Curls
-    'bicep_curls': {'cueGood': 'Full curl!', 'cueBad': 'Squeeze!'},
+    // ===== HINGE PATTERN =====
+    'deadlift': ExerciseConfig(patternType: PatternType.hinge),
+    'barbell_deadlift': ExerciseConfig(patternType: PatternType.hinge),
+    'sumo_deadlift': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100}),
+    'romanian_deadlift': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 95}),
+    'rdl': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 95}),
+    'stiff_leg_deadlift': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 90}),
+    'single_leg_deadlift': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100}),
+    'trap_bar_deadlift': ExerciseConfig(patternType: PatternType.hinge),
+    'good_morning': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100}),
+    'kettlebell_swing': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100, 'resetAngle': 170}),
+    'hip_thrust': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
+    'glute_bridge': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
+    'single_leg_glute_bridge': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
+    'barbell_hip_thrust': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
+    'cable_pull_through': ExerciseConfig(patternType: PatternType.hinge),
+    'back_extension': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100, 'resetAngle': 170}),
+    'hyperextension': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100, 'resetAngle': 170}),
+    'superman': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 160, 'resetAngle': 130}),
+    'superman_raise': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 160, 'resetAngle': 130}),
+    
+    // ===== CURL PATTERN =====
+    'bicep_curl': ExerciseConfig(patternType: PatternType.curl),
+    'barbell_curl': ExerciseConfig(patternType: PatternType.curl),
+    'dumbbell_curl': ExerciseConfig(patternType: PatternType.curl),
+    'hammer_curl': ExerciseConfig(patternType: PatternType.curl),
+    'preacher_curl': ExerciseConfig(patternType: PatternType.curl),
+    'concentration_curl': ExerciseConfig(patternType: PatternType.curl),
+    'cable_curl': ExerciseConfig(patternType: PatternType.curl),
+    'incline_curl': ExerciseConfig(patternType: PatternType.curl),
+    'spider_curl': ExerciseConfig(patternType: PatternType.curl),
+    'ez_bar_curl': ExerciseConfig(patternType: PatternType.curl),
+    'reverse_curl': ExerciseConfig(patternType: PatternType.curl),
+    'zottman_curl': ExerciseConfig(patternType: PatternType.curl),
+    'tricep_extension': ExerciseConfig(patternType: PatternType.curl),
+    'overhead_tricep_extension': ExerciseConfig(patternType: PatternType.curl),
+    'tricep_pushdown': ExerciseConfig(patternType: PatternType.curl),
+    'rope_pushdown': ExerciseConfig(patternType: PatternType.curl),
+    'skull_crusher': ExerciseConfig(patternType: PatternType.curl),
+    'close_grip_bench': ExerciseConfig(patternType: PatternType.curl),
+    'tricep_kickback': ExerciseConfig(patternType: PatternType.curl),
+    'lateral_raise': ExerciseConfig(patternType: PatternType.curl),
+    'front_raise': ExerciseConfig(patternType: PatternType.curl),
+    'rear_delt_fly': ExerciseConfig(patternType: PatternType.curl),
+    'upright_row': ExerciseConfig(patternType: PatternType.curl),
+    'shrug': ExerciseConfig(patternType: PatternType.curl),
+    'barbell_shrug': ExerciseConfig(patternType: PatternType.curl),
+    'dumbbell_shrug': ExerciseConfig(patternType: PatternType.curl),
+    'wrist_curl': ExerciseConfig(patternType: PatternType.curl),
+    'reverse_wrist_curl': ExerciseConfig(patternType: PatternType.curl),
+    
+    // ===== KNEE DRIVE PATTERN =====
+    'mountain_climber': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'mountain_climbers': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'high_knees': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'high_knee': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'running_in_place': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'bicycle_crunch': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'bicycle_crunches': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'flutter_kick': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'flutter_kicks': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'scissor_kick': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'scissor_kicks': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'butt_kicks': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'butt_kick': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'a_skip': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'b_skip': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'skater': ExerciseConfig(patternType: PatternType.kneeDrive),
+    'skaters': ExerciseConfig(patternType: PatternType.kneeDrive),
+    
+    // ===== HOLD PATTERN =====
+    'plank': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'forearm_plank': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'high_plank': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'side_plank': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'side_plank_left': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'side_plank_right': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'wall_sit': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.wallSit}),
+    'wall_squat': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.wallSit}),
+    'dead_hang': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.hang}),
+    'active_hang': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.hang}),
+    'l_sit': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'hollow_hold': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'hollow_body_hold': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'superman_hold': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'arch_hold': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'boat_pose': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.plank}),
+    'warrior_pose': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'tree_pose': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'downward_dog': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'childs_pose': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'pigeon_pose': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'cobra_stretch': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'cat_cow': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'hamstring_stretch': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'quad_stretch': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'hip_flexor_stretch': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'butterfly_stretch': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    '90_90_stretch': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    'frog_stretch': ExerciseConfig(patternType: PatternType.hold, params: {'holdType': HoldType.stretch}),
+    
+    // ===== ROTATION PATTERN =====
+    'russian_twist': ExerciseConfig(patternType: PatternType.rotation),
+    'russian_twists': ExerciseConfig(patternType: PatternType.rotation),
+    'woodchopper': ExerciseConfig(patternType: PatternType.rotation, params: {'triggerAngle': 60}),
+    'wood_chopper': ExerciseConfig(patternType: PatternType.rotation, params: {'triggerAngle': 60}),
+    'cable_woodchop': ExerciseConfig(patternType: PatternType.rotation, params: {'triggerAngle': 60}),
+    'cable_rotation': ExerciseConfig(patternType: PatternType.rotation),
+    'oblique_twist': ExerciseConfig(patternType: PatternType.rotation, params: {'triggerAngle': 40}),
+    'standing_rotation': ExerciseConfig(patternType: PatternType.rotation),
+    'seated_rotation': ExerciseConfig(patternType: PatternType.rotation),
+    'medicine_ball_twist': ExerciseConfig(patternType: PatternType.rotation),
+    'landmine_rotation': ExerciseConfig(patternType: PatternType.rotation, params: {'triggerAngle': 50}),
+    
+    // ===== CALF PATTERN =====
+    'calf_raise': ExerciseConfig(patternType: PatternType.calf),
+    'calf_raises': ExerciseConfig(patternType: PatternType.calf),
+    'standing_calf_raise': ExerciseConfig(patternType: PatternType.calf),
+    'seated_calf_raise': ExerciseConfig(patternType: PatternType.calf),
+    'single_leg_calf_raise': ExerciseConfig(patternType: PatternType.calf),
+    'donkey_calf_raise': ExerciseConfig(patternType: PatternType.calf),
+    'smith_machine_calf_raise': ExerciseConfig(patternType: PatternType.calf),
   };
 }
-
