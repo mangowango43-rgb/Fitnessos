@@ -65,7 +65,10 @@ class WorkoutSession {
   // Patterns already return 0.0 to 1.0, just pass through
   double get chargeProgress => _engine.chargeProgress;
   RepState? get repState => _engine.state;
-  
+
+  // TRIGGER FLASH: True for one frame when user hits trigger point
+  bool get justHitTrigger => _engine.justHitTrigger;
+
   /// Initialize the session
   Future<void> init() async {
     await _voice.init();
