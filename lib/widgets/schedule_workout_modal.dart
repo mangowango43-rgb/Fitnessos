@@ -24,6 +24,10 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('📱 ScheduleWorkoutModal: Building for date: ${widget.selectedDate}');
+    debugPrint('   - Alarm enabled: $_alarmEnabled');
+    debugPrint('   - Selected time: $_selectedTime');
+
     final dateStr = DateFormat('EEEE, MMM d').format(widget.selectedDate);
     final isToday = widget.selectedDate.year == DateTime.now().year &&
                     widget.selectedDate.month == DateTime.now().month &&
@@ -84,7 +88,10 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                     ],
                   ),
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      debugPrint('❌ ScheduleWorkoutModal: CLOSED via X button (returning null)');
+                      Navigator.pop(context);
+                    },
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -132,10 +139,12 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                     child: ElevatedButton(
                       onPressed: () {
                         HapticFeedback.heavyImpact();
-                        Navigator.pop(context, {
+                        final result = {
                           'time': _alarmEnabled ? _selectedTime : null,
                           'repeatDays': <int>[],
-                        });
+                        };
+                        debugPrint('🔙 ScheduleWorkoutModal: Returning result: $result');
+                        Navigator.pop(context, result);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.cyberLime,
@@ -160,7 +169,9 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                   TextButton(
                     onPressed: () {
                       HapticFeedback.lightImpact();
-                      Navigator.pop(context, {'time': null, 'repeatDays': <int>[]});
+                      final result = {'time': null, 'repeatDays': <int>[]};
+                      debugPrint('🔙 ScheduleWorkoutModal: SKIP ALARM - Returning result: $result');
+                      Navigator.pop(context, result);
                     },
                     child: const Text('Skip Alarm', style: TextStyle(color: AppColors.white50, fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
