@@ -42,9 +42,10 @@ class _WorkoutDateStripState extends State<WorkoutDateStrip> {
   
   void _generateDates() {
     final now = DateTime.now();
-    final startDate = DateTime(now.year, now.month, now.day - 15);
+    // 30 days back, 365 days forward (so user can schedule way ahead)
+    final startDate = DateTime(now.year, now.month, now.day - 30);
     
-    _dates = List.generate(60, (index) {
+    _dates = List.generate(395, (index) { // 30 + 365 = 395 days
       return startDate.add(Duration(days: index));
     });
   }
@@ -153,6 +154,45 @@ class _WorkoutDateStripState extends State<WorkoutDateStrip> {
                       ),
                       child: const Icon(
                         Icons.chevron_right,
+                        size: 16,
+                        color: AppColors.white70,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Calendar jump button
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: widget.selectedDate,
+                        firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        builder: (context, child) {
+                          return Theme(
+                            data: ThemeData.dark().copyWith(
+                              colorScheme: ColorScheme.dark(
+                                primary: accentColor,
+                                surface: Colors.black,
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        widget.onDateSelected(picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.white10,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.white20),
+                      ),
+                      child: const Icon(
+                        Icons.calendar_month,
                         size: 16,
                         color: AppColors.white70,
                       ),
