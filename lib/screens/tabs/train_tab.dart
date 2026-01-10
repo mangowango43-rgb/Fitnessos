@@ -179,13 +179,12 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
         // _feedback removed - voice coach handles feedback now
         _formScore = _session?.formScore ?? 0;
 
-        // SKELETON FLASH: Green when trigger hit, normal otherwise
-        if (_session?.justHitTrigger == true) {
-          _skeletonState = SkeletonState.success;  // GREEN FLASH on trigger
-        } else if (!_showRepFlash) {
+        // SIMPLE SKELETON: Always normal, flash success only on rep count
+        // The success flash is handled in onRepCounted callback
+        if (!_showRepFlash) {
           _skeletonState = SkeletonState.normal;
         }
-        // Note: _skeletonState = SkeletonState.success is also set in onRepCounted
+        // Note: _skeletonState = SkeletonState.success is set in onRepCounted
 
         // Update power gauge fill based on charge progress
         final chargeProgress = _session?.chargeProgress ?? 0.0;
