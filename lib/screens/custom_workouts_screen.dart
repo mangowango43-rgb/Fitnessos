@@ -250,15 +250,18 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Main content
+          // Main content - now fully scrollable
           SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                _buildCategoryFilter(),
-                _buildSearchBar(),
-                Expanded(
-                  child: _buildExerciseLibrary(),
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader()),
+                SliverToBoxAdapter(child: _buildCategoryFilter()),
+                SliverToBoxAdapter(child: _buildSearchBar()),
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                    bottom: _selectedExercises.isNotEmpty ? MediaQuery.of(context).size.height * 0.25 : 0,
+                  ),
+                  sliver: _buildExerciseLibrarySliver(),
                 ),
               ],
             ),
@@ -625,6 +628,48 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
     );
   }
 
+  // New sliver version for scrollable layout
+  Widget _buildExerciseLibrarySliver() {
+    final exercises = _filteredExercises;
+
+    if (exercises.isEmpty) {
+      return SliverFillRemaining(
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.fitness_center, size: 64, color: AppColors.white30),
+              SizedBox(height: 16),
+              Text(
+                'No exercises found',
+                style: TextStyle(color: AppColors.white50, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final exercise = exercises[index];
+          final isSelected = _selectedExercises.any((e) => e.id == exercise.id);
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              bottom: index == exercises.length - 1 ? 20 : 12,
+            ),
+            child: _buildExerciseCard(exercise, isSelected),
+          );
+        },
+        childCount: exercises.length,
+      ),
+    );
+  }
+
   Widget _buildExerciseCard(Exercise exercise, bool isSelected) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -740,10 +785,10 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
   Widget _buildWorkoutBuilderPanel() {
     return DraggableScrollableSheet(
       initialChildSize: 0.45, // Increased from 0.35 to make it more visible
-      minChildSize: 0.20, // Increased from 0.15
+      minChildSize: 0.25, // Increased from 0.20 so more content is visible
       maxChildSize: 0.85, // Increased from 0.7 for better expansion
       snap: true,
-      snapSizes: const [0.20, 0.45, 0.85], // Snap points for smooth interaction
+      snapSizes: const [0.25, 0.45, 0.85], // Snap points for smooth interaction
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
@@ -766,31 +811,45 @@ class _CustomWorkoutsScreenState extends ConsumerState<CustomWorkoutsScreen> {
           ),
           child: Column(
             children: [
-              // Drag handle
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.white30,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              // Larger draggable header area
+              GestureDetector(
+                onVerticalDragUpdate: (details) {
+                  // Allow the entire header to be draggable
+                },
+                child: Container(
+                  color: Colors.transparent,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    children: [
+                      // Drag handle
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 12),
+                        width: 50,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: AppColors.white40,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
 
-              // Workout name
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: TextField(
-                  controller: _workoutNameController,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: 'Workout Name',
-                    hintStyle: TextStyle(color: AppColors.white40),
-                    border: InputBorder.none,
+                      // Workout name
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: TextField(
+                          controller: _workoutNameController,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'Workout Name',
+                            hintStyle: TextStyle(color: AppColors.white40),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
