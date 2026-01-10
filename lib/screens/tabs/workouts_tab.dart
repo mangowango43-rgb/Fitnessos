@@ -626,19 +626,27 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
     final isScheduling = ref.read(isSchedulingModeProvider);
     
     if (isScheduling && scheduleDate != null) {
-      // SCHEDULING MODE: Create a workout schedule for the selected date
+      // SCHEDULING MODE: Create or update workout schedule for the selected date
       debugPrint('📅 Scheduling workout ${preset.name} for date: $scheduleDate');
       
-      // Create a schedule for the selected date
+      // Check if there's an existing schedule for this date
+      final allSchedules = ref.read(workoutSchedulesProvider);
+      WorkoutSchedule? existingSchedule = allSchedules.where((s) {
+        return s.scheduledDate.year == scheduleDate.year &&
+               s.scheduledDate.month == scheduleDate.month &&
+               s.scheduledDate.day == scheduleDate.day;
+      }).firstOrNull;
+      
+      // Create or update schedule for the selected date
       final schedule = WorkoutSchedule(
-        id: '${DateTime.now().millisecondsSinceEpoch}_${scheduleDate.millisecondsSinceEpoch}',
+        id: existingSchedule?.id ?? '${DateTime.now().millisecondsSinceEpoch}_${scheduleDate.millisecondsSinceEpoch}',
         workoutId: preset.id,
         workoutName: preset.name,
         scheduledDate: DateTime(scheduleDate.year, scheduleDate.month, scheduleDate.day),
-        scheduledTime: null, // No time set yet
-        hasAlarm: false,
-        createdAt: DateTime.now(),
-        repeatDays: [], // No repeat - one-time schedule
+        scheduledTime: existingSchedule?.scheduledTime, // Preserve existing time
+        hasAlarm: existingSchedule?.hasAlarm ?? false, // Preserve existing alarm setting
+        createdAt: existingSchedule?.createdAt ?? DateTime.now(),
+        repeatDays: existingSchedule?.repeatDays ?? [], // Preserve existing repeat days
       );
       
       // Save schedule to Hive
