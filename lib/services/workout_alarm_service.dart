@@ -113,10 +113,17 @@ class WorkoutAlarmService {
       int successCount = 0;
       int failCount = 0;
 
+      // Check timeOfDay is valid before scheduling
+      final timeOfDay = schedule.timeOfDay;
+      if (timeOfDay == null) {
+        debugPrint('❌ Failed to parse time from: ${schedule.scheduledTime}');
+        return;
+      }
+
       // Schedule for each repeat day
       for (final day in schedule.repeatDays) {
         final alarmId = _getAlarmId(schedule.id, day);
-        final scheduledTime = _getNextAlarmTime(day, schedule.timeOfDay);
+        final scheduledTime = _getNextAlarmTime(day, timeOfDay);
 
         debugPrint('📅 Scheduling alarm for ${_getDayName(day)}:');
         debugPrint('   - alarmId: $alarmId');
