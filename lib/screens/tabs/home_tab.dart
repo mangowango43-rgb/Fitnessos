@@ -6,6 +6,7 @@ import '../../utils/app_colors.dart';
 import '../../providers/stats_provider.dart';
 import '../../providers/workout_provider.dart';
 import '../../providers/workout_schedule_provider.dart';
+import '../../providers/schedule_date_provider.dart';
 import '../../models/workout_schedule.dart';
 import '../../models/workout_models.dart';
 import '../../models/workout_data.dart';
@@ -13,7 +14,6 @@ import '../../services/storage_service.dart';
 import '../../services/workout_alarm_service.dart';
 import '../../widgets/animated_counter.dart';
 import '../../widgets/schedule_workout_modal.dart';
-import '../../widgets/workout_library_modal.dart';
 import '../../widgets/workout_date_strip.dart';
 import '../home_screen.dart' show TabNavigator;
 import '../tabs/settings_tab.dart';
@@ -847,12 +847,18 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       
                       const SizedBox(width: 10),
                       
-                      // EDIT Button - Opens workout library
+                      // EDIT Button - Goes to Workouts tab to schedule
                       GestureDetector(
-                        onTap: () async {
+                        onTap: () {
                           HapticFeedback.mediumImpact();
-                          // Show workout library to choose different workout
-                          await _openWorkoutLibrary();
+                          // Set the selected date for scheduling
+                          ref.read(selectedScheduleDateProvider.notifier).state = _selectedDate;
+                          ref.read(isSchedulingModeProvider.notifier).state = true;
+                          // Navigate to Workouts tab
+                          final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+                          if (navigator != null) {
+                            (navigator as dynamic).changeTab(2); // Workouts tab
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.all(14),
@@ -933,13 +939,20 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           // Two buttons: Quick schedule (no alarm) + Schedule with alarm
           Row(
             children: [
-              // Quick schedule (no alarm)
+              // Quick schedule (no alarm) - Goes to Workouts tab
               Expanded(
                 child: GestureDetector(
-                  onTap: () async {
+                  onTap: () {
                     HapticFeedback.mediumImpact();
-                    debugPrint('🚀 QUICK ADD tapped for date: $_selectedDate');
-                    await _openWorkoutLibrary();
+                    debugPrint('🚀 QUICK ADD tapped - setting schedule date and navigating to Workouts tab');
+                    // Set the selected date for scheduling
+                    ref.read(selectedScheduleDateProvider.notifier).state = _selectedDate;
+                    ref.read(isSchedulingModeProvider.notifier).state = true;
+                    // Navigate to Workouts tab
+                    final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+                    if (navigator != null) {
+                      (navigator as dynamic).changeTab(2); // Workouts tab
+                    }
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1362,66 +1375,6 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /// Open workout library to schedule workout for selected date
-  Future<void> _openWorkoutLibrary() async {
-    final selected = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const WorkoutLibraryModal(),
-    );
-
-    if (selected != null && mounted) {
-      // Create a schedule for the selected date
-      final schedule = WorkoutSchedule(
-        id: '${DateTime.now().millisecondsSinceEpoch}_${_selectedDate.millisecondsSinceEpoch}',
-        workoutId: selected['id'] as String,
-        workoutName: selected['name'] as String,
-        scheduledDate: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
-        scheduledTime: null, // No time set yet
-        hasAlarm: false,
-        createdAt: DateTime.now(),
-        repeatDays: [], // No repeat - one-time schedule
-      );
-      
-      // Save schedule to Hive
-      await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
-      
-      // Only commit to global provider if scheduling for TODAY
-      final now = DateTime.now();
-      final isSchedulingForToday = _selectedDate.year == now.year &&
-                                  _selectedDate.month == now.month &&
-                                  _selectedDate.day == now.day;
-      
-      if (isSchedulingForToday) {
-        final preset = WorkoutPreset(
-          id: selected['id'] as String,
-          name: selected['name'] as String,
-          category: 'gym',
-          subcategory: selected['type'] as String? ?? 'gym',
-          exercises: [], // Will be populated from workout data
-          isCircuit: false,
-          duration: selected['duration'] as String?,
-        );
-        
-        await ref
-            .read(committedWorkoutProvider.notifier)
-            .commitWorkout(preset);
-      }
-      
-      if (mounted) {
-        final dateStr = isSchedulingForToday 
-            ? 'today'
-            : '${_selectedDate.month}/${_selectedDate.day}';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ ${selected['name']} scheduled for $dateStr!'),
-            backgroundColor: AppColors.cyberLime,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
 
 
   /// Open schedule workout flow (date long-press)

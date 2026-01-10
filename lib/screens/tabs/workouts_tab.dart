@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../models/workout_data.dart';
 import '../../models/workout_models.dart';
+import '../../models/workout_schedule.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/text_styles.dart';
 import '../../widgets/glassmorphism_card.dart';
 import '../../widgets/glow_button.dart';
 import '../../widgets/exercise_animation_widget.dart';
 import '../../providers/workout_provider.dart';
+import '../../providers/workout_schedule_provider.dart';
+import '../../providers/schedule_date_provider.dart';
 import '../workout_editor_screen.dart';
 import '../custom_workouts_screen.dart';
 import '../home_screen.dart' show TabNavigator;
@@ -617,40 +621,115 @@ class _WorkoutsTabState extends ConsumerState<WorkoutsTab> {
   Future<void> _commitWorkout(WorkoutPreset preset) async {
     HapticFeedback.mediumImpact();
     
-    // Commit the workout
-    await ref.read(committedWorkoutProvider.notifier).commitWorkout(preset);
+    // Check if we're in scheduling mode (user came from home tab)
+    final scheduleDate = ref.read(selectedScheduleDateProvider);
+    final isScheduling = ref.read(isSchedulingModeProvider);
     
-    // Show confirmation
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: AppColors.cyberLime),
-              const SizedBox(width: 12),
-              Text(
-                'Workout Committed! ✅',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.white10,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppColors.cyberLime.withOpacity(0.3)),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+    if (isScheduling && scheduleDate != null) {
+      // SCHEDULING MODE: Create a workout schedule for the selected date
+      debugPrint('📅 Scheduling workout ${preset.name} for date: $scheduleDate');
+      
+      // Create a schedule for the selected date
+      final schedule = WorkoutSchedule(
+        id: '${DateTime.now().millisecondsSinceEpoch}_${scheduleDate.millisecondsSinceEpoch}',
+        workoutId: preset.id,
+        workoutName: preset.name,
+        scheduledDate: DateTime(scheduleDate.year, scheduleDate.month, scheduleDate.day),
+        scheduledTime: null, // No time set yet
+        hasAlarm: false,
+        createdAt: DateTime.now(),
+        repeatDays: [], // No repeat - one-time schedule
       );
       
-      // Navigate to home tab to show the committed workout in hero card
-      final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-      if (navigator != null) {
-        (navigator as dynamic).changeTab(0); // Home tab
+      // Save schedule to Hive
+      await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
+      
+      // If scheduling for TODAY, also commit to global provider
+      final now = DateTime.now();
+      final isSchedulingForToday = scheduleDate.year == now.year &&
+                                  scheduleDate.month == now.month &&
+                                  scheduleDate.day == now.day;
+      
+      if (isSchedulingForToday) {
+        await ref.read(committedWorkoutProvider.notifier).commitWorkout(preset);
+      }
+      
+      // Clear the scheduling state
+      ref.read(selectedScheduleDateProvider.notifier).state = null;
+      ref.read(isSchedulingModeProvider.notifier).state = false;
+      
+      // Show confirmation
+      if (mounted) {
+        final dateStr = DateFormat('MMM d').format(scheduleDate);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppColors.cyberLime),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Scheduled ${preset.name} for $dateStr! ✅',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.white10,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: AppColors.cyberLime.withOpacity(0.3)),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        
+        // Navigate back to home tab
+        final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+        if (navigator != null) {
+          (navigator as dynamic).changeTab(0); // Home tab
+        }
+      }
+    } else {
+      // NORMAL MODE: Just commit the workout (old behavior)
+      await ref.read(committedWorkoutProvider.notifier).commitWorkout(preset);
+      
+      // Show confirmation
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppColors.cyberLime),
+                const SizedBox(width: 12),
+                Text(
+                  'Workout Committed! ✅',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.white10,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: AppColors.cyberLime.withOpacity(0.3)),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        
+        // Navigate to home tab to show the committed workout in hero card
+        final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
+        if (navigator != null) {
+          (navigator as dynamic).changeTab(0); // Home tab
+        }
       }
     }
   }
