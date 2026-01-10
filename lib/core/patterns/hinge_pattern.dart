@@ -3,19 +3,19 @@ import 'dart:math' as math;
 import 'base_pattern.dart';
 
 /// =============================================================================
-/// HINGE PATTERN - Hip Angle
+/// HINGE PATTERN - Hip Angle (Shoulder-Hip-Knee)
 /// =============================================================================
-/// Used for: deadlift, romanian_deadlift, glute_bridge, kettlebell_swings, etc.
+/// Used for: deadlift, glute_bridge, hip_thrust, kettlebell_swing, etc.
 /// 
-/// Logic: Track the angle at the hip (shoulder-hip-knee).
-/// When you hinge forward, this angle CLOSES (gets smaller).
-/// When you stand up, it OPENS (gets bigger).
+/// Normal mode (inverted=false): Triggers when angle DECREASES (deadlift, RDL)
+/// Inverted mode (inverted=true): Triggers when angle INCREASES (glute bridge, hip thrust)
 /// =============================================================================
 
 class HingePattern implements BasePattern {
   // Config
-  final double triggerAngle; // e.g. 105 = trigger when angle drops to 105°
-  final double resetAngle; // e.g. 165 = reset when angle returns to 165°
+  final double triggerAngle;
+  final double resetAngle;
+  final bool inverted; // true for glute bridge, false for deadlift
   final String cueGood;
   final String cueBad;
   
@@ -40,30 +40,30 @@ class HingePattern implements BasePattern {
   HingePattern({
     this.triggerAngle = 105,
     this.resetAngle = 165,
+    this.inverted = false,
     this.cueGood = "Lockout!",
     this.cueBad = "Hips forward!",
   });
   
-  // Getters
-  @override
-  RepState get state => _state;
-  @override
-  bool get isLocked => _baselineCaptured;
-  @override
-  int get repCount => _repCount;
-  @override
-  String get feedback => _feedback;
-  @override
-  bool get justHitTrigger => _justHitTrigger;
+  @override RepState get state => _state;
+  @override bool get isLocked => _baselineCaptured;
+  @override int get repCount => _repCount;
+  @override String get feedback => _feedback;
+  @override bool get justHitTrigger => _justHitTrigger;
   
   @override
   double get chargeProgress {
-    // 180° = standing, triggerAngle = hinged
-    double progress = (180 - _currentAngle) / (180 - triggerAngle);
-    return progress.clamp(0.0, 1.0);
+    if (inverted) {
+      // Glute bridge: progress as angle INCREASES toward trigger
+      double progress = (_currentAngle - resetAngle) / (triggerAngle - resetAngle);
+      return progress.clamp(0.0, 1.0);
+    } else {
+      // Deadlift: progress as angle DECREASES toward trigger
+      double progress = (180 - _currentAngle) / (180 - triggerAngle);
+      return progress.clamp(0.0, 1.0);
+    }
   }
   
-  // Helper: Calculate angle at vertex point
   double _calculateAngle(PoseLandmark a, PoseLandmark v, PoseLandmark b) {
     double v1x = a.x - v.x, v1y = a.y - v.y, v1z = a.z - v.z;
     double v2x = b.x - v.x, v2y = b.y - v.y, v2z = b.z - v.z;
@@ -89,7 +89,13 @@ class HingePattern implements BasePattern {
       return;
     }
     
-    _smoothedAngle = 180;
+    // Set initial angle based on mode
+    if (inverted) {
+      _smoothedAngle = resetAngle; // Start at low angle for glute bridge
+    } else {
+      _smoothedAngle = 180; // Start standing for deadlift
+    }
+    
     _baselineCaptured = true;
     _state = RepState.ready;
     _feedback = "LOCKED";
@@ -101,7 +107,7 @@ class HingePattern implements BasePattern {
       _feedback = "Waiting for lock";
       return false;
     }
-
+    
     _justHitTrigger = false;
     
     final shoulder = map[PoseLandmarkType.leftShoulder];
@@ -113,18 +119,25 @@ class HingePattern implements BasePattern {
       return false;
     }
     
-    // Calculate hip angle (shoulder-hip-knee)
     double rawAngle = _calculateAngle(shoulder, hip, knee);
-    
-    // Smooth it
     _smoothedAngle = (_smoothingFactor * rawAngle) + ((1 - _smoothingFactor) * _smoothedAngle);
     _currentAngle = _smoothedAngle;
     
-    // Check triggers
-    bool isDown = _currentAngle <= triggerAngle;
-    bool isReset = _currentAngle >= resetAngle;
+    // DIRECTION-AWARE TRIGGERS
+    bool isDown;
+    bool isReset;
     
-    // State machine
+    if (inverted) {
+      // Glute bridge: trigger when angle INCREASES past threshold
+      isDown = _currentAngle >= triggerAngle;
+      isReset = _currentAngle <= resetAngle;
+    } else {
+      // Deadlift: trigger when angle DECREASES past threshold
+      isDown = _currentAngle <= triggerAngle;
+      isReset = _currentAngle >= resetAngle;
+    }
+    
+    // State machine (EXACT SAME AS WORKING PATTERNS)
     switch (_state) {
       case RepState.ready:
       case RepState.up:
@@ -188,10 +201,9 @@ class HingePattern implements BasePattern {
     _state = RepState.ready;
     _feedback = "";
     _intentTimer = null;
-    _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
-    _smoothedAngle = 180;
-    _currentAngle = 180;
+    _baselineCaptured = false;
+    _smoothedAngle = inverted ? resetAngle : 180;
+    _currentAngle = _smoothedAngle;
     _justHitTrigger = false;
   }
 }
-

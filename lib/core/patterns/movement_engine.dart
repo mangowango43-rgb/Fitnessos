@@ -113,6 +113,7 @@ class MovementEngine {
         
       case PatternType.push:
         return PushPattern(
+          inverted: config.params['inverted'] ?? false,
           cueGood: config.params['cueGood'] ?? 'Perfect!',
           cueBad: config.params['cueBad'] ?? 'Go lower!',
         );
@@ -127,6 +128,7 @@ class MovementEngine {
         
       case PatternType.hinge:
         return HingePattern(
+          inverted: config.params['inverted'] ?? false,
           triggerAngle: config.params['triggerAngle'] ?? 105,
           resetAngle: config.params['resetAngle'] ?? 165,
           cueGood: config.params['cueGood'] ?? 'Lockout!',
@@ -224,11 +226,11 @@ class MovementEngine {
     'decline_bench_press': ExerciseConfig(patternType: PatternType.push),
     'decline_press': ExerciseConfig(patternType: PatternType.push),
     'dumbbell_press': ExerciseConfig(patternType: PatternType.push),
-    'overhead_press': ExerciseConfig(patternType: PatternType.push),
-    'shoulder_press': ExerciseConfig(patternType: PatternType.push),
-    'military_press': ExerciseConfig(patternType: PatternType.push),
-    'arnold_press': ExerciseConfig(patternType: PatternType.push),
-    'push_press': ExerciseConfig(patternType: PatternType.push),
+    'overhead_press': ExerciseConfig(patternType: PatternType.push, params: {'inverted': true, 'cueGood': 'Lockout!', 'cueBad': 'Press higher!'}),
+    'shoulder_press': ExerciseConfig(patternType: PatternType.push, params: {'inverted': true, 'cueGood': 'Lockout!', 'cueBad': 'Press higher!'}),
+    'military_press': ExerciseConfig(patternType: PatternType.push, params: {'inverted': true, 'cueGood': 'Lockout!', 'cueBad': 'Press higher!'}),
+    'arnold_press': ExerciseConfig(patternType: PatternType.push, params: {'inverted': true, 'cueGood': 'Lockout!', 'cueBad': 'Press higher!'}),
+    'push_press': ExerciseConfig(patternType: PatternType.push, params: {'inverted': true, 'cueGood': 'Lockout!', 'cueBad': 'Press higher!'}),
     'dips': ExerciseConfig(patternType: PatternType.push),
     'tricep_dips': ExerciseConfig(patternType: PatternType.push),
     'bench_dips': ExerciseConfig(patternType: PatternType.push),
@@ -273,15 +275,15 @@ class MovementEngine {
     'trap_bar_deadlift': ExerciseConfig(patternType: PatternType.hinge),
     'good_morning': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100}),
     'kettlebell_swing': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100, 'resetAngle': 170}),
-    'hip_thrust': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
-    'glute_bridge': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
-    'single_leg_glute_bridge': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
-    'barbell_hip_thrust': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 165, 'resetAngle': 110}),
+    'hip_thrust': ExerciseConfig(patternType: PatternType.hinge, params: {'inverted': true, 'triggerAngle': 170, 'resetAngle': 120, 'cueGood': 'Squeeze!', 'cueBad': 'Thrust higher!'}),
+    'glute_bridge': ExerciseConfig(patternType: PatternType.hinge, params: {'inverted': true, 'triggerAngle': 165, 'resetAngle': 120, 'cueGood': 'Squeeze!', 'cueBad': 'Hips up!'}),
+    'single_leg_glute_bridge': ExerciseConfig(patternType: PatternType.hinge, params: {'inverted': true, 'triggerAngle': 165, 'resetAngle': 120, 'cueGood': 'Squeeze!', 'cueBad': 'Hips up!'}),
+    'barbell_hip_thrust': ExerciseConfig(patternType: PatternType.hinge, params: {'inverted': true, 'triggerAngle': 170, 'resetAngle': 120, 'cueGood': 'Squeeze!', 'cueBad': 'Thrust higher!'}),
     'cable_pull_through': ExerciseConfig(patternType: PatternType.hinge),
     'back_extension': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100, 'resetAngle': 170}),
     'hyperextension': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 100, 'resetAngle': 170}),
-    'superman': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 160, 'resetAngle': 130}),
-    'superman_raise': ExerciseConfig(patternType: PatternType.hinge, params: {'triggerAngle': 160, 'resetAngle': 130}),
+    'superman': ExerciseConfig(patternType: PatternType.hinge, params: {'inverted': true, 'triggerAngle': 160, 'resetAngle': 130, 'cueGood': 'Hold!', 'cueBad': 'Lift higher!'}),
+    'superman_raise': ExerciseConfig(patternType: PatternType.hinge, params: {'inverted': true, 'triggerAngle': 160, 'resetAngle': 130, 'cueGood': 'Hold!', 'cueBad': 'Lift higher!'}),
     
     // ===== CURL PATTERN =====
     'bicep_curl': ExerciseConfig(patternType: PatternType.curl),

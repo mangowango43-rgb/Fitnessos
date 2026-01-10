@@ -5,15 +5,15 @@ import 'base_pattern.dart';
 /// =============================================================================
 /// PUSH PATTERN - Shoulder-to-Wrist Y Distance
 /// =============================================================================
-/// Used for: push_ups, bench_press, tricep_dips, overhead_press, etc.
+/// Used for: push_ups, bench_press, overhead_press, dips, etc.
 /// 
-/// Logic: Track vertical distance between shoulders and wrists.
-/// When you go down, this distance SHRINKS.
-/// When you come up, it GROWS back.
+/// Normal mode (inverted=false): Triggers when gap SHRINKS (pushup, bench)
+/// Inverted mode (inverted=true): Triggers when gap GROWS (overhead press)
 /// =============================================================================
 
 class PushPattern implements BasePattern {
   // Config
+  final bool inverted; // true for overhead press, false for pushup
   final String cueGood;
   final String cueBad;
   
@@ -25,7 +25,7 @@ class PushPattern implements BasePattern {
   bool _justHitTrigger = false;
   
   // Baseline
-  double _baselineTarget = 0; // Y-distance between shoulders and wrists at start
+  double _baselineTarget = 0;
   
   // Current values
   double _currentPercentage = 100;
@@ -39,37 +39,28 @@ class PushPattern implements BasePattern {
   static const int _minTimeBetweenRepsMs = 500;
   
   PushPattern({
+    this.inverted = false,
     this.cueGood = "Perfect!",
-    this.cueBad = "Go lower!",
+    this.cueBad = "Full range!",
   });
   
-  // Getters
-  @override
-  RepState get state => _state;
-  @override
-  bool get isLocked => _baselineCaptured;
-  @override
-  int get repCount => _repCount;
-  @override
-  String get feedback => _feedback;
-  @override
-  bool get justHitTrigger => _justHitTrigger;
+  @override RepState get state => _state;
+  @override bool get isLocked => _baselineCaptured;
+  @override int get repCount => _repCount;
+  @override String get feedback => _feedback;
+  @override bool get justHitTrigger => _justHitTrigger;
   
   @override
   double get chargeProgress {
-    // 100% = up, 90% = down trigger
-    // So progress = (100 - current) / (100 - 90) = (100 - current) / 10
-    double progress = (100 - _currentPercentage) / 10;
-    return progress.clamp(0.0, 1.0);
-  }
-  
-  // Helper: 3D distance
-  double _dist3D(PoseLandmark a, PoseLandmark b) {
-    return math.sqrt(
-      math.pow(b.x - a.x, 2) + 
-      math.pow(b.y - a.y, 2) + 
-      math.pow(b.z - a.z, 2)
-    );
+    if (inverted) {
+      // Overhead press: progress as gap grows (percentage increases)
+      double progress = (_currentPercentage - 100) / 50; // 100% -> 150% = full progress
+      return progress.clamp(0.0, 1.0);
+    } else {
+      // Pushup: progress as gap shrinks (percentage decreases)
+      double progress = (100 - _currentPercentage) / 10;
+      return progress.clamp(0.0, 1.0);
+    }
   }
   
   @override
@@ -84,7 +75,6 @@ class PushPattern implements BasePattern {
       return;
     }
     
-    // Store Y-distance between shoulders and wrists (vertical gap)
     double shoulderY = (lShoulder.y + rShoulder.y) / 2;
     double wristY = (lWrist.y + rWrist.y) / 2;
     _baselineTarget = (wristY - shoulderY).abs();
@@ -106,7 +96,7 @@ class PushPattern implements BasePattern {
       _feedback = "Waiting for lock";
       return false;
     }
-
+    
     _justHitTrigger = false;
     
     final lShoulder = map[PoseLandmarkType.leftShoulder];
@@ -119,26 +109,33 @@ class PushPattern implements BasePattern {
       return false;
     }
     
-    // Calculate current Y-distance
     double shoulderY = (lShoulder.y + rShoulder.y) / 2;
     double wristY = (lWrist.y + rWrist.y) / 2;
     double currentYDiff = (wristY - shoulderY).abs();
     
-    // Calculate percentage
     double rawPercentage = 100;
     if (_baselineTarget > 0.01) {
       rawPercentage = (currentYDiff / _baselineTarget) * 100;
     }
     
-    // Smooth it
     _smoothedPercentage = (_smoothingFactor * rawPercentage) + ((1 - _smoothingFactor) * _smoothedPercentage);
-    _currentPercentage = _smoothedPercentage.clamp(0, 150);
+    _currentPercentage = _smoothedPercentage.clamp(0, 200);
     
-    // Check triggers
-    bool isDown = _currentPercentage <= 90; // Gap shrinks to 90% = down
-    bool isReset = _currentPercentage >= 95; // Back to 95% = up
+    // DIRECTION-AWARE TRIGGERS
+    bool isDown;
+    bool isReset;
     
-    // State machine
+    if (inverted) {
+      // Overhead press: trigger when gap GROWS (percentage > 140%)
+      isDown = _currentPercentage >= 140;
+      isReset = _currentPercentage <= 110;
+    } else {
+      // Pushup: trigger when gap SHRINKS (percentage < 90%)
+      isDown = _currentPercentage <= 90;
+      isReset = _currentPercentage >= 95;
+    }
+    
+    // State machine (EXACT SAME AS WORKING PATTERNS)
     switch (_state) {
       case RepState.ready:
       case RepState.up:
@@ -155,7 +152,7 @@ class PushPattern implements BasePattern {
         } else {
           _intentTimer = null;
           _state = RepState.ready;
-          if (!isReset && _currentPercentage < 95) {
+          if (!isReset) {
             _feedback = cueBad;
           } else {
             _feedback = "";
@@ -206,10 +203,9 @@ class PushPattern implements BasePattern {
     _state = RepState.ready;
     _feedback = "";
     _intentTimer = null;
-    _baselineCaptured = false;  // CRITICAL: Allow re-lock for Set 2
+    _baselineCaptured = false;
     _smoothedPercentage = 100;
     _currentPercentage = 100;
     _justHitTrigger = false;
   }
 }
-
