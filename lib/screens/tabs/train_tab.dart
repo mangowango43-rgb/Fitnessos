@@ -261,11 +261,14 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     };
     
     _session!.onSetComplete = (setComplete, totalSets) {
+      print('📞 onSetComplete callback: setComplete=$setComplete, totalSets=$totalSets');
       if (setComplete >= totalSets) {
         // Move to next exercise
+        print('→ Calling _nextExercise()');
         _nextExercise();
       } else {
         // Start rest timer
+        print('→ Calling _startRest()');
         _startRest();
       }
     };
@@ -451,19 +454,19 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
     _restTimer?.cancel();
     setState(() => _isResting = false);
     
-    // Check if we need to do more sets of current exercise
-    final currentSet = _session?.currentSet ?? 0;
-    final targetSets = _session?.targetSets ?? 0;
+    // Check if the exercise is complete (all sets done)
+    final isExerciseComplete = _session?.isExerciseComplete ?? false;
     
-    print('🔄 END REST: Set $currentSet of $targetSets');
+    print('🔄 END REST: isExerciseComplete=$isExerciseComplete');
     
-    if (currentSet <= targetSets) {
-      // More sets to go for THIS exercise (or starting the last one)
-      _session?.startNextSet();
-    } else {
+    if (isExerciseComplete) {
       // All sets complete for this exercise - MOVE TO NEXT
       print('✅ Exercise complete, moving to next');
       _advanceToNextExercise();
+    } else {
+      // More sets to go for THIS exercise
+      print('▶️ Starting next set');
+      _session?.startNextSet();
     }
   }
 
@@ -1271,12 +1274,12 @@ class _TrainTabState extends ConsumerState<TrainTab> with TickerProviderStateMix
   }
 
   Widget _buildRestScreen() {
-    // Determine if this is the last set of current exercise
-    final currentSet = _session?.currentSet ?? 0;
-    final targetSets = _session?.targetSets ?? 0;
-    final isLastSetOfExercise = currentSet >= targetSets;
+    // Check if the session is complete (all sets done for current exercise)
+    // If session.isExerciseComplete is true, we've finished all sets and should show next exercise
+    // Otherwise, we're just resting between sets of the SAME exercise
+    final isExerciseComplete = _session?.isExerciseComplete ?? false;
     final hasNextExercise = _currentExerciseIndex < (_committedWorkout?.exercises.length ?? 0) - 1;
-    final showNextExercisePreview = isLastSetOfExercise && hasNextExercise;
+    final showNextExercisePreview = isExerciseComplete && hasNextExercise;
     
     return Container(
       color: Colors.black.withOpacity(0.95),

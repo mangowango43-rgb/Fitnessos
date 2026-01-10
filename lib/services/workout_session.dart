@@ -43,9 +43,10 @@ class WorkoutSession {
   bool get isActive => _isActive;
   bool get isResting => _isResting;
   int get currentReps => _engine.repCount ?? 0;
-  int get currentSet => _currentSetIndex + 1;
+  int get currentSet => _currentSetIndex + 1; // Returns 1-indexed set number (1, 2, 3, etc.)
   int get targetReps => _targetReps;
   int get targetSets => _targetSets;
+  bool get isExerciseComplete => _currentSetIndex >= _targetSets; // Check if all sets are done
   double get currentAngle => (_engine.chargeProgress * 100) ?? 0;
   double get formScore => (_engine.chargeProgress * 100) ?? 0;
   String get feedback => _engine.feedback ?? '';
@@ -189,16 +190,22 @@ class WorkoutSession {
   void _onSetComplete() {
     _currentSetIndex++;
     
+    print('🎯 SET COMPLETE: _currentSetIndex=$_currentSetIndex, _targetSets=$_targetSets');
+    
     if (_currentSetIndex >= _targetSets) {
-      // Exercise complete
+      // ALL SETS COMPLETE FOR THIS EXERCISE
+      print('✅ ALL SETS DONE! Moving to next exercise');
       _voice.announceSetComplete(_currentSetIndex, _targetSets);
       onSetComplete?.call(_currentSetIndex, _targetSets);
       _isActive = false;
+      _isResting = false; // Not resting, exercise is done
     } else {
-      // More sets to go
+      // MORE SETS TO GO - Enter rest
+      print('⏸️ More sets to go. Resting before set ${_currentSetIndex + 1}');
       _voice.announceSetComplete(_currentSetIndex, _targetSets);
       onSetComplete?.call(_currentSetIndex, _targetSets);
       _isResting = true;
+      _isActive = true; // Still active, just resting
     }
   }
   
