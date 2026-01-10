@@ -1408,7 +1408,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const WorkoutLibraryModal(),
+      builder: (context) => WorkoutLibraryModal(),
     );
 
     debugPrint('📥 WorkoutLibraryModal returned: $selectedWorkout');
