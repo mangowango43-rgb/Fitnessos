@@ -226,6 +226,63 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           // Right: Streak Badge + Settings Icon (MORE SPACING)
           Row(
             children: [
+              // 🧪 TEST ALARM BUTTON (for debugging)
+              GestureDetector(
+                onTap: () async {
+                  HapticFeedback.heavyImpact();
+                  debugPrint('🧪 TEST ALARM BUTTON PRESSED!');
+                  
+                  // Check if service is initialized
+                  if (!WorkoutAlarmService.isInitialized()) {
+                    debugPrint('❌ WorkoutAlarmService NOT initialized!');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('❌ Alarm service not initialized!'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  debugPrint('✅ Service is initialized, scheduling test alarm...');
+                  
+                  // Check pending alarms BEFORE
+                  await WorkoutAlarmService.getPendingNotifications();
+                  
+                  // Schedule test alarm
+                  await WorkoutAlarmService.scheduleTestAlarm();
+                  
+                  // Check pending alarms AFTER
+                  await Future.delayed(const Duration(milliseconds: 500));
+                  final pending = await WorkoutAlarmService.getPendingNotifications();
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('🧪 Test alarm scheduled! ${pending.length} total pending.'),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.bug_report,
+                    color: Colors.red,
+                    size: 20,
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 12),
+              
               // Streak Badge (NO RED BORDER)
               GestureDetector(
                 onTap: () {

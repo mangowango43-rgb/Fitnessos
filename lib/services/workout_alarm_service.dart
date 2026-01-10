@@ -87,15 +87,23 @@ class WorkoutAlarmService {
   /// Schedule weekly alarms for a workout using local notifications only
   /// Uses EXACT logic from FutureYou
   static Future<void> scheduleAlarm(WorkoutSchedule schedule) async {
+    debugPrint('═══════════════════════════════════════════════════════════════════');
+    debugPrint('🔔 scheduleAlarm() CALLED');
+    debugPrint('═══════════════════════════════════════════════════════════════════');
+    
     if (!schedule.hasAlarm) {
-      debugPrint(
-          '⏰ scheduleAlarm skipped: hasAlarm=false for "${schedule.workoutName}"');
+      debugPrint('⏰ scheduleAlarm skipped: hasAlarm=false for "${schedule.workoutName}"');
       return;
     }
 
     if (schedule.scheduledTime == null || schedule.scheduledTime!.isEmpty) {
-      debugPrint(
-          '❌ scheduleAlarm FAILED: time is EMPTY for "${schedule.workoutName}"');
+      debugPrint('❌ scheduleAlarm FAILED: time is EMPTY for "${schedule.workoutName}"');
+      return;
+    }
+
+    if (schedule.repeatDays.isEmpty) {
+      debugPrint('❌ scheduleAlarm FAILED: repeatDays is EMPTY for "${schedule.workoutName}"');
+      debugPrint('   This is the bug! repeatDays must contain at least one day.');
       return;
     }
 
@@ -383,6 +391,25 @@ class WorkoutAlarmService {
         'scheduleId': entry.value['scheduleId'] ?? 'Unknown',
         'day': entry.value['day'] ?? 0,
       };
+    }).toList();
+  }
+
+  /// Get ALL pending notification requests from the OS
+  static Future<List<Map<String, dynamic>>> getPendingNotifications() async {
+    final pending = await _notifications.pendingNotificationRequests();
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('📋 PENDING NOTIFICATIONS FROM OS:');
+    debugPrint('   Total count: ${pending.length}');
+    for (final notif in pending) {
+      debugPrint('   - ID: ${notif.id}, Title: ${notif.title}, Body: ${notif.body}');
+    }
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    return pending.map((notif) => {
+      'id': notif.id,
+      'title': notif.title,
+      'body': notif.body,
+      'payload': notif.payload,
     }).toList();
   }
 }
