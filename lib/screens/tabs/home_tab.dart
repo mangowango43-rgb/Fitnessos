@@ -14,6 +14,7 @@ import '../../services/storage_service.dart';
 import '../../services/workout_alarm_service.dart';
 import '../../widgets/animated_counter.dart';
 import '../../widgets/schedule_workout_modal.dart';
+import '../../widgets/workout_library_modal.dart';
 import '../../widgets/workout_date_strip.dart';
 import '../home_screen.dart' show TabNavigator;
 import '../tabs/settings_tab.dart';
@@ -1408,7 +1409,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => WorkoutLibraryModal(),
+      builder: (context) => const WorkoutLibraryModal(),
     );
 
     debugPrint('📥 WorkoutLibraryModal returned: $selectedWorkout');
