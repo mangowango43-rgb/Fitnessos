@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
@@ -22,6 +23,10 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('📱 ScheduleWorkoutModal: Building for date: ${widget.selectedDate}');
+    debugPrint('   - Alarm enabled: $_alarmEnabled');
+    debugPrint('   - Selected time: $_selectedTime');
+
     final dateStr = DateFormat('EEEE, MMM d').format(widget.selectedDate);
     final isToday = widget.selectedDate.year == DateTime.now().year &&
                     widget.selectedDate.month == DateTime.now().month &&
@@ -69,7 +74,10 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          debugPrint('❌ ScheduleWorkoutModal: CLOSED via X button (returning null)');
+                          Navigator.pop(context);
+                        },
                         icon: const Icon(Icons.close, color: Colors.white70),
                       ),
                     ],
@@ -135,10 +143,12 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                     child: ElevatedButton(
                       onPressed: () {
                         HapticFeedback.mediumImpact();
-                        Navigator.pop(context, {
+                        final result = {
                           'time': _alarmEnabled ? _selectedTime : null,
                           'repeatDays': <int>[], // No repeat days for one-time alarms
-                        });
+                        };
+                        debugPrint('🔙 ScheduleWorkoutModal: Returning result: $result');
+                        Navigator.pop(context, result);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.cyberLime,
@@ -162,10 +172,12 @@ class _ScheduleWorkoutModalState extends State<ScheduleWorkoutModal> {
                   // Secondary button
                   TextButton(
                     onPressed: () {
-                      Navigator.pop(context, {
+                      final result = {
                         'time': null,
                         'repeatDays': <int>[],
-                      });
+                      };
+                      debugPrint('🔙 ScheduleWorkoutModal: SKIP ALARM - Returning result: $result');
+                      Navigator.pop(context, result);
                     },
                     child: const Text(
                       'Skip Alarm',

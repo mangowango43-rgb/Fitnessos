@@ -1334,6 +1334,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
   /// Open schedule workout flow (date long-press)
   Future<void> _openScheduleWorkoutFlow(DateTime date) async {
+    debugPrint('═══════════════════════════════════════════════════');
+    debugPrint('🚀 _openScheduleWorkoutFlow STARTED for date: $date');
+
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -1341,9 +1344,21 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       builder: (context) => ScheduleWorkoutModal(selectedDate: date),
     );
 
-    if (result == null || !mounted) return;
+    debugPrint('📥 ScheduleWorkoutModal returned: $result');
+
+    if (result == null) {
+      debugPrint('❌ EARLY EXIT: result is null (modal dismissed or cancelled)');
+      return;
+    }
+
+    if (!mounted) {
+      debugPrint('❌ EARLY EXIT: widget not mounted');
+      return;
+    }
 
     // User set time/alarm, now show workout library
+    debugPrint('📖 Opening WorkoutLibraryModal...');
+
     final selectedWorkout = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -1351,69 +1366,93 @@ class _HomeTabState extends ConsumerState<HomeTab> {
       builder: (context) => const WorkoutLibraryModal(),
     );
 
-    if (selectedWorkout != null && mounted) {
-      final timeData = result['time'] as TimeOfDay?;
-      final hasAlarm = timeData != null;
+    debugPrint('📥 WorkoutLibraryModal returned: $selectedWorkout');
 
-      // Create schedule
-      final schedule = WorkoutSchedule(
-        id: '${DateTime.now().millisecondsSinceEpoch}',
-        workoutId: selectedWorkout['id'] as String,
-        workoutName: selectedWorkout['name'] as String,
-        scheduledDate: DateTime(date.year, date.month, date.day),
-        scheduledTime: timeData != null 
-            ? '${timeData.hour.toString().padLeft(2, '0')}:${timeData.minute.toString().padLeft(2, '0')}'
-            : null,
-        hasAlarm: hasAlarm,
-        createdAt: DateTime.now(),
-        repeatDays: [], // No repeat - one-time schedule
-      );
+    if (selectedWorkout == null) {
+      debugPrint('❌ EARLY EXIT: selectedWorkout is null (no workout selected)');
+      return;
+    }
 
-      // Save schedule
-      await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
+    if (!mounted) {
+      debugPrint('❌ EARLY EXIT: widget not mounted after workout selection');
+      return;
+    }
 
-      if (mounted) {
-        final dateStr = DateFormat('MMM d').format(date);
-        final timeStr = timeData?.format(context);
-        
-        // Show enhanced confirmation snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    final timeData = result['time'] as TimeOfDay?;
+    final hasAlarm = timeData != null;
+
+    debugPrint('⏰ Time data: $timeData');
+    debugPrint('🔔 Has alarm: $hasAlarm');
+
+    // Create schedule
+    final schedule = WorkoutSchedule(
+      id: '${DateTime.now().millisecondsSinceEpoch}',
+      workoutId: selectedWorkout['id'] as String,
+      workoutName: selectedWorkout['name'] as String,
+      scheduledDate: DateTime(date.year, date.month, date.day),
+      scheduledTime: timeData != null
+          ? '${timeData.hour.toString().padLeft(2, '0')}:${timeData.minute.toString().padLeft(2, '0')}'
+          : null,
+      hasAlarm: hasAlarm,
+      createdAt: DateTime.now(),
+      repeatDays: [], // No repeat - one-time schedule
+    );
+
+    debugPrint('📋 Created schedule:');
+    debugPrint('   - ID: ${schedule.id}');
+    debugPrint('   - Workout: ${schedule.workoutName}');
+    debugPrint('   - Date: ${schedule.scheduledDate}');
+    debugPrint('   - Time: ${schedule.scheduledTime}');
+    debugPrint('   - Has Alarm: ${schedule.hasAlarm}');
+
+    // Save schedule (this triggers alarm scheduling in the provider!)
+    debugPrint('💾 Saving schedule via provider...');
+    await ref.read(workoutSchedulesProvider.notifier).saveSchedule(schedule);
+    debugPrint('✅ Schedule saved!');
+
+    if (mounted) {
+      final dateStr = DateFormat('MMM d').format(date);
+      final timeStr = timeData?.format(context);
+
+      // Show enhanced confirmation snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '✅ ${selectedWorkout['name']} scheduled!',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                ),
+              ),
+              if (hasAlarm) ...[
+                const SizedBox(height: 4),
                 Text(
-                  '✅ ${selectedWorkout['name']} scheduled!',
+                  '⏰ Alarm set for $dateStr at $timeStr',
                   style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
+                    fontSize: 13,
+                    color: Colors.black87,
                   ),
                 ),
-                if (hasAlarm) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '⏰ Alarm set for $dateStr at $timeStr',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
               ],
-            ),
-            backgroundColor: AppColors.cyberLime,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            action: hasAlarm ? SnackBarAction(
-              label: 'TEST',
-              textColor: Colors.black,
-              onPressed: () => _scheduleTestAlarm(),
-            ) : null,
+            ],
           ),
-        );
-      }
+          backgroundColor: AppColors.cyberLime,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          action: hasAlarm ? SnackBarAction(
+            label: 'TEST',
+            textColor: Colors.black,
+            onPressed: () => _scheduleTestAlarm(),
+          ) : null,
+        ),
+      );
     }
+
+    debugPrint('═══════════════════════════════════════════════════');
   }
   
   /// Schedule a test alarm that fires in 1 minute
