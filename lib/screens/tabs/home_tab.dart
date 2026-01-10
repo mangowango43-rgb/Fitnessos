@@ -847,15 +847,12 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                       
                       const SizedBox(width: 10),
                       
-                      // EDIT Button - Goes to Workouts tab
+                      // EDIT Button - Opens workout library
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
                           HapticFeedback.mediumImpact();
-                          // Navigate to Workouts tab to choose workout
-                          final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-                          if (navigator != null) {
-                            (navigator as dynamic).changeTab(2); // Workouts tab
-                          }
+                          // Show workout library to choose different workout
+                          await _openWorkoutLibrary();
                         },
                         child: Container(
                           padding: const EdgeInsets.all(14),
@@ -936,17 +933,13 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           // Two buttons: Quick schedule (no alarm) + Schedule with alarm
           Row(
             children: [
-              // Quick schedule (no alarm) - Goes to Workouts tab
+              // Quick schedule (no alarm)
               Expanded(
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: () async {
                     HapticFeedback.mediumImpact();
-                    debugPrint('🚀 QUICK ADD tapped - navigating to Workouts tab');
-                    // Navigate to Workouts tab to choose workout
-                    final navigator = context.findAncestorWidgetOfExactType<TabNavigator>();
-                    if (navigator != null) {
-                      (navigator as dynamic).changeTab(2); // Workouts tab
-                    }
+                    debugPrint('🚀 QUICK ADD tapped for date: $_selectedDate');
+                    await _openWorkoutLibrary();
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
