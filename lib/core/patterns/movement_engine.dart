@@ -47,25 +47,52 @@ class MovementEngine {
   /// Set the current exercise - creates the appropriate pattern
   void setExercise(String exerciseId) {
     _currentExerciseId = exerciseId.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
-    
+
     final config = exercises[_currentExerciseId];
     if (config == null) {
       // Default to squat pattern for unknown exercises
       _activePattern = SquatPattern();
       return;
     }
-    
+
     _activePattern = _createPattern(config);
   }
-  
-  /// Capture baseline position
-  void captureBaseline(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    _activePattern?.captureBaseline(landmarks);
+
+  /// LEGACY: Alias for setExercise for backwards compatibility
+  void loadExercise(String exerciseId) => setExercise(exerciseId);
+
+  /// Check if an exercise has a pattern configured
+  static bool hasPattern(String exerciseId) {
+    final normalized = exerciseId.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
+    return exercises.containsKey(normalized);
   }
-  
+
+  /// Capture baseline position (Map version)
+  void captureBaseline(dynamic landmarks) {
+    if (_activePattern == null) return;
+
+    // Handle both List<PoseLandmark> and Map<PoseLandmarkType, PoseLandmark>
+    if (landmarks is List<PoseLandmark>) {
+      final map = {for (var lm in landmarks) lm.type: lm};
+      _activePattern!.captureBaseline(map);
+    } else if (landmarks is Map<PoseLandmarkType, PoseLandmark>) {
+      _activePattern!.captureBaseline(landmarks);
+    }
+  }
+
   /// Process a frame - returns true if rep was counted
-  bool processFrame(Map<PoseLandmarkType, PoseLandmark> landmarks) {
-    return _activePattern?.processFrame(landmarks) ?? false;
+  bool processFrame(dynamic landmarks) {
+    if (_activePattern == null) return false;
+
+    // Handle both List<PoseLandmark> and Map<PoseLandmarkType, PoseLandmark>
+    if (landmarks is List<PoseLandmark>) {
+      final map = {for (var lm in landmarks) lm.type: lm};
+      return _activePattern!.processFrame(map);
+    } else if (landmarks is Map<PoseLandmarkType, PoseLandmark>) {
+      return _activePattern!.processFrame(landmarks);
+    }
+
+    return false;
   }
   
   /// Reset the current pattern
