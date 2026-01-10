@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../models/workout_schedule.dart';
@@ -29,14 +28,7 @@ class WorkoutAlarmService {
     try {
       debugPrint('🔧 Initializing WorkoutAlarmService...');
 
-      // Request permissions
-      final notifStatus = await Permission.notification.request();
-      debugPrint('📱 Notification permission: $notifStatus');
-
-      final alarmStatus = await Permission.scheduleExactAlarm.request();
-      debugPrint('⏰ Exact alarm permission: $alarmStatus');
-
-      // Initialize notification plugin
+      // Initialize notification plugin FIRST
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosInit = DarwinInitializationSettings(
         requestAlertPermission: true,
@@ -54,23 +46,36 @@ class WorkoutAlarmService {
       );
       debugPrint('✅ Notification plugin initialized');
 
-      // Create notification channel with MAXIMUM PRIORITY and SOUND
-      const workoutChannel = AndroidNotificationChannel(
-        _channelId,
-        _channelName,
-        description: _channelDescription,
-        importance: Importance.max,
-        playSound: true,
-        enableVibration: true,
-        enableLights: true,
-      );
-
+      // Get Android plugin for platform-specific setup
       final androidPlugin = _notifications
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
       
-      await androidPlugin?.createNotificationChannel(workoutChannel);
-      debugPrint('✅ Notification channel created');
+      if (androidPlugin != null) {
+        // Request notification permission (Android 13+)
+        final notifGranted = await androidPlugin.requestNotificationsPermission();
+        debugPrint('📱 Notification permission granted: $notifGranted');
+        
+        // Request exact alarm permission (Android 12+)
+        final alarmGranted = await androidPlugin.requestExactAlarmsPermission();
+        debugPrint('⏰ Exact alarm permission granted: $alarmGranted');
+        
+        // Create notification channel with MAXIMUM PRIORITY
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            _channelId,
+            _channelName,
+            description: _channelDescription,
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+          ),
+        );
+        debugPrint('✅ Notification channel created');
+      } else {
+        debugPrint('⚠️ Android plugin not available (iOS or web?)');
+      }
 
       _initialized = true;
       debugPrint('🎉 WorkoutAlarmService fully initialized!');

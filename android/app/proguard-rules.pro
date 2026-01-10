@@ -1,53 +1,21 @@
-# FitnessOS ProGuard Rules
-# Optimized for ML Kit Pose Detection + Flutter
+# Flutter Local Notifications - CRITICAL for scheduled alarms
+-keep class com.dexterous.** { *; }
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
 
-# ========================================
-# ML KIT POSE DETECTION
-# ========================================
--keep class com.google.mlkit.** { *; }
--keep class com.google.android.gms.internal.** { *; }
--dontwarn com.google.android.gms.internal.**
+# Gson (used by flutter_local_notifications)
+-keep class com.google.gson.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
 
-# Keep pose landmark types
--keep class com.google.mlkit.vision.pose.** { *; }
--keep interface com.google.mlkit.vision.pose.** { *; }
+# Keep notification classes
+-keep class * extends android.app.Activity
+-keep class * extends android.content.BroadcastReceiver
+-keep class * extends android.app.Service
 
-# ========================================
-# FLUTTER & DART
-# ========================================
--keep class io.flutter.** { *; }
--keep class io.flutter.embedding.** { *; }
--dontwarn io.flutter.embedding.**
+# Keep AndroidX classes
+-keep class androidx.core.app.NotificationCompat { *; }
+-keep class androidx.core.app.NotificationManagerCompat { *; }
 
-# ========================================
-# CAMERA & MEDIA
-# ========================================
--keep class androidx.camera.** { *; }
--dontwarn androidx.camera.**
-
-# ========================================
-# SENSORS (for gyroscope calibration)
-# ========================================
--keep class android.hardware.Sensor { *; }
--keep class android.hardware.SensorEvent { *; }
--keep class android.hardware.SensorManager { *; }
-
-# ========================================
-# PERFORMANCE OPTIMIZATIONS
-# ========================================
-# Remove logging in release builds
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
-}
-
-# Optimize math operations
--optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*
--optimizationpasses 5
--allowaccessmodification
--dontpreverify
-
-# Preserve line numbers for crash reports
--keepattributes SourceFile,LineNumberTable
--renamesourcefileattribute SourceFile
+# Timezone data
+-keep class org.threeten.** { *; }
+-dontwarn org.threeten.**
